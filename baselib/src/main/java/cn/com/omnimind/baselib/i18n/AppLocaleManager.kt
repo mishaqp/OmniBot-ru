@@ -44,7 +44,7 @@ enum class PromptLocale(
 data class LocalizedText(
     val zhCN: String,
     val enUS: String,
-    val ruRU: String = enUS
+    val ruRU: String
 ) {
     fun resolve(locale: PromptLocale): String {
         return when (locale) {
