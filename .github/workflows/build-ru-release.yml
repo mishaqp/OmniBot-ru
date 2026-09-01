@@ -1,0 +1,148 @@
+name: Build RU Signed Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: 'Optional artifact suffix (for example 0.6.0.3-ru1)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ru-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '17'
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.28.0'
+  FLUTTER_VERSION: '3.38.7'
+  ANDROID_BUILD_TOOLS_VERSION: '36.0.0'
+  ANDROID_PLATFORM_VERSION: '36'
+  ANDROID_CMAKE_VERSION: '3.22.1'
+  NDK_VERSION: '28.2.13676358'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Free runner disk space
+        shell: bash
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost || true
+          df -h
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: webchat/pnpm-lock.yaml
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +o pipefail
+          yes | sdkmanager --licenses >/dev/null
+          set -o pipefail
+          sdkmanager \
+            "ndk;${NDK_VERSION}" \
+            "platforms;android-${ANDROID_PLATFORM_VERSION}" \
+            "build-tools;${ANDROID_BUILD_TOOLS_VERSION}" \
+            "cmake;${ANDROID_CMAKE_VERSION}"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Prepare release signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || secrets.RELEASE_KEYSTORE }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || secrets.RELEASE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || secrets.RELEASE_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing signing secret: ${name}" >&2
+              exit 1
+            fi
+          done
+          keystore_path="$RUNNER_TEMP/omnibot-ru-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+          echo "ANDROID_KEYSTORE_PATH=$keystore_path" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        shell: bash
+        env:
+          RELEASE_NAME: ${{ inputs.release_name }}
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8 --enable-native-access=ALL-UNNAMED
+        run: |
+          set -euo pipefail
+          out_dir="$RUNNER_TEMP/omnibot-ru-release"
+          mkdir -p "$out_dir"
+          args=(--edition standard --out-dir "$out_dir" --non-interactive)
+          if [[ -n "${RELEASE_NAME:-}" ]]; then
+            args+=(--tag "v${RELEASE_NAME#v}")
+          fi
+          bash scripts/build-local-release.sh "${args[@]}"
+          echo "RU_RELEASE_DIR=$out_dir" >> "$GITHUB_ENV"
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$(find "$RU_RELEASE_DIR" -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -n "$apk"
+          "$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS_VERSION/apksigner" verify --verbose --print-certs "$apk"
+          sha256sum "$apk"
+
+      - name: Upload signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniBot-RU-signed-release
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ env.RU_RELEASE_DIR }}/*.apk
+            ${{ env.RU_RELEASE_DIR }}/*.sha256
+            ${{ env.RU_RELEASE_DIR }}/manifest.txt

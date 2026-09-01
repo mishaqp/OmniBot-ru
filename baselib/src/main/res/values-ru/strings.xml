@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="permission_request_purpose_title">Использование разрешения</string>
+    <string name="permission_request_purpose_continue">Продолжить</string>
+    <string name="permission_btn_deny_text">Запретить</string>
+    <string name="permission_btn_allow_text">Разрешить</string>
+    <string name="permission_prompt_template">Разрешить %1$s «%2$s»?</string>
+</resources>

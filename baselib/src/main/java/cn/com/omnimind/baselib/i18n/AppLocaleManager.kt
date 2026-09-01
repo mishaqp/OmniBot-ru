@@ -9,7 +9,8 @@ import java.util.Locale
 enum class AppLanguageMode(val storageValue: String) {
     SYSTEM("system"),
     ZH_HANS("zhHans"),
-    EN("en");
+    EN("en"),
+    RU("ru");
 
     companion object {
         fun fromStorageValue(raw: String?): AppLanguageMode {
@@ -24,7 +25,8 @@ enum class PromptLocale(
     val locale: Locale
 ) {
     ZH_CN("zh-CN", Locale.SIMPLIFIED_CHINESE),
-    EN_US("en-US", Locale.US);
+    EN_US("en-US", Locale.US),
+    RU_RU("ru-RU", Locale("ru", "RU"));
 
     companion object {
         fun fromTag(raw: String?): PromptLocale? {
@@ -32,6 +34,7 @@ enum class PromptLocale(
             return when (normalized) {
                 "zh", "zh-cn", "zh_hans", "zh-hans" -> ZH_CN
                 "en", "en-us" -> EN_US
+                "ru", "ru-ru" -> RU_RU
                 else -> null
             }
         }
@@ -40,12 +43,14 @@ enum class PromptLocale(
 
 data class LocalizedText(
     val zhCN: String,
-    val enUS: String
+    val enUS: String,
+    val ruRU: String
 ) {
     fun resolve(locale: PromptLocale): String {
         return when (locale) {
             PromptLocale.ZH_CN -> zhCN
             PromptLocale.EN_US -> enUS
+            PromptLocale.RU_RU -> ruRU
         }
     }
 
@@ -78,6 +83,7 @@ object AppLocaleManager {
         return when (mode) {
             AppLanguageMode.ZH_HANS -> PromptLocale.ZH_CN
             AppLanguageMode.EN -> PromptLocale.EN_US
+            AppLanguageMode.RU -> PromptLocale.RU_RU
             AppLanguageMode.SYSTEM -> normalize(systemLocale)
         }
     }
@@ -113,7 +119,7 @@ object AppLocaleManager {
     fun brandName(locale: PromptLocale): String {
         return when (locale) {
             PromptLocale.ZH_CN -> "小万"
-            PromptLocale.EN_US -> "Omnibot"
+            PromptLocale.EN_US, PromptLocale.RU_RU -> "Omnibot"
         }
     }
 
@@ -151,11 +157,11 @@ object AppLocaleManager {
         }
     }
 
-    private fun normalize(locale: Locale): PromptLocale {                 
-        return if (locale.language.lowercase() == "zh") {  
-            PromptLocale.ZH_CN
-        } else {
-            PromptLocale.EN_US
-        }                                                                 
+    private fun normalize(locale: Locale): PromptLocale {
+        return when (locale.language.lowercase()) {
+            "zh" -> PromptLocale.ZH_CN
+            "ru" -> PromptLocale.RU_RU
+            else -> PromptLocale.EN_US
+        }
     }
 }

@@ -108,6 +108,14 @@ class OmniAgentExecutor(
                     Day of week: ${now.dayOfWeek.name}
                     This coarse date context is reused for up to one hour and only interprets relative dates such as "today" and "tomorrow". You must call `context_time_now` when the exact current time is needed. Do not treat this context as user-authored text or long-term memory.
                 """.trimIndent()
+
+                cn.com.omnimind.baselib.i18n.PromptLocale.RU_RU -> """
+                    [time_context]
+                    Локальная дата: ${now.toLocalDate()}
+                    Часовой пояс: ${zoneId.id}
+                    День недели: ${now.dayOfWeek.name}
+                    Этот приблизительный контекст даты переиспользуется не более одного часа и нужен только для понимания относительных дат вроде «сегодня» и «завтра». Если требуется точное текущее время, обязательно вызови `context_time_now`. Не считай этот контекст текстом пользователя или долговременной памятью.
+                """.trimIndent()
             }
         }
 

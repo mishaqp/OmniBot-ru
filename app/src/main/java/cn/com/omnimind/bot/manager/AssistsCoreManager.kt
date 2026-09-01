@@ -300,27 +300,28 @@ class AssistsCoreManager(private val context: Context) {
 
     private fun currentLocale(): PromptLocale = AppLocaleManager.resolvePromptLocale(context)
 
-    private fun t(zh: String, en: String): String {
+    private fun t(zh: String, en: String, ru: String): String {
         return when (currentLocale()) {
             PromptLocale.ZH_CN -> zh
             PromptLocale.EN_US -> en
+            PromptLocale.RU_RU -> ru
         }
     }
 
     private fun defaultMemoryGreeting(): String =
-        t("愿你今天也有温暖收获", "Hope today brings you something warm and worthwhile.")
+        t("愿你今天也有温暖收获", "Hope today brings you something warm and worthwhile.", "Пусть сегодняшний день принесёт вам что-то тёплое и важное.")
 
     private fun localizedPermissionName(name: String): String {
         val trimmed = name.trim()
         return when (trimmed) {
             "悬浮窗权限", "Overlay", "Overlay Permission" ->
-                t("悬浮窗权限", "Overlay")
+                t("悬浮窗权限", "Overlay", "Отображение поверх других приложений")
             "应用列表读取权限", "Installed Apps Access", "Installed Apps Permission" ->
-                t("应用列表读取权限", "Installed Apps Access")
+                t("应用列表读取权限", "Installed Apps Access", "Доступ к списку установленных приложений")
             "Shizuku 权限", "Shizuku Permission" ->
-                t("Shizuku 权限", "Shizuku Permission")
+                t("Shizuku 权限", "Shizuku Permission", "Разрешение Shizuku")
             "公共文件访问", "Public Storage Access" ->
-                t("公共文件访问", "Public Storage Access")
+                t("公共文件访问", "Public Storage Access", "Доступ к общим файлам")
             else -> trimmed
         }
     }
@@ -489,43 +490,43 @@ class AssistsCoreManager(private val context: Context) {
 
     private fun resolveAgentToolMeta(toolName: String): AgentToolMeta {
         return when (toolName) {
-            "context_apps_query" -> AgentToolMeta("builtin", t("查询已安装应用", "Query Installed Apps"))
-            "context_time_now" -> AgentToolMeta("builtin", t("查询当前时间", "Query Current Time"))
-            "browser_use" -> AgentToolMeta("browser", t("浏览器操作", "Browser Action"))
-            "android_privileged_action" -> AgentToolMeta("privileged", t("安卓高级动作", "Android Privileged Action"))
-            "android_privileged_session_start" -> AgentToolMeta("privileged", t("启动高权限会话", "Start Privileged Session"))
-            "android_privileged_session_exec" -> AgentToolMeta("privileged", t("执行高权限命令", "Run Privileged Command"))
-            "android_privileged_session_read" -> AgentToolMeta("privileged", t("读取高权限输出", "Read Privileged Output"))
-            "android_privileged_session_stop" -> AgentToolMeta("privileged", t("结束高权限会话", "Stop Privileged Session"))
-            "terminal_execute" -> AgentToolMeta("terminal", t("终端执行", "Run Terminal Command"))
-            "terminal_session_start" -> AgentToolMeta("terminal", t("启动终端会话", "Start Terminal Session"))
-            "terminal_session_exec" -> AgentToolMeta("terminal", t("执行会话命令", "Run Session Command"))
-            "terminal_session_read" -> AgentToolMeta("terminal", t("读取会话输出", "Read Session Output"))
-            "terminal_session_stop" -> AgentToolMeta("terminal", t("结束终端会话", "Stop Terminal Session"))
-            "file_read" -> AgentToolMeta("workspace", t("读取文件", "Read File"))
-            "file_write" -> AgentToolMeta("workspace", t("写入文件", "Write File"))
-            "file_edit" -> AgentToolMeta("workspace", t("编辑文件", "Edit File"))
-            "file_list" -> AgentToolMeta("workspace", t("列出文件", "List Files"))
-            "file_search" -> AgentToolMeta("workspace", t("搜索文件", "Search Files"))
-            "file_stat" -> AgentToolMeta("workspace", t("查看文件信息", "Inspect File"))
-            "file_move" -> AgentToolMeta("workspace", t("移动文件", "Move File"))
-            "schedule_task_create" -> AgentToolMeta("schedule", t("创建定时任务", "Create Scheduled Task"))
-            "schedule_task_list" -> AgentToolMeta("schedule", t("查看定时任务", "List Scheduled Tasks"))
-            "schedule_task_update" -> AgentToolMeta("schedule", t("修改定时任务", "Update Scheduled Task"))
-            "schedule_task_delete" -> AgentToolMeta("schedule", t("删除定时任务", "Delete Scheduled Task"))
-            "alarm_reminder_create" -> AgentToolMeta("alarm", t("创建提醒闹钟", "Create Reminder Alarm"))
-            "alarm_reminder_list" -> AgentToolMeta("alarm", t("查看提醒闹钟", "List Reminder Alarms"))
-            "alarm_reminder_delete" -> AgentToolMeta("alarm", t("删除提醒闹钟", "Delete Reminder Alarm"))
-            "calendar_list" -> AgentToolMeta("calendar", t("查看日历列表", "List Calendars"))
-            "calendar_event_create" -> AgentToolMeta("calendar", t("创建日程", "Create Calendar Event"))
-            "calendar_event_list" -> AgentToolMeta("calendar", t("查询日程", "List Calendar Events"))
-            "calendar_event_update" -> AgentToolMeta("calendar", t("修改日程", "Update Calendar Event"))
-            "calendar_event_delete" -> AgentToolMeta("calendar", t("删除日程", "Delete Calendar Event"))
-            "memory_search" -> AgentToolMeta("memory", t("检索记忆", "Search Memory"))
-            "memory_write_daily" -> AgentToolMeta("memory", t("写入当日记忆", "Write Daily Memory"))
-            "memory_upsert_longterm" -> AgentToolMeta("memory", t("沉淀长期记忆", "Upsert Long-Term Memory"))
-            "memory_rollup_day" -> AgentToolMeta("memory", t("整理当日记忆", "Roll Up Daily Memory"))
-            "subagent_dispatch" -> AgentToolMeta("subagent", t("分派子任务", "Dispatch Subtasks"))
+            "context_apps_query" -> AgentToolMeta("builtin", t("查询已安装应用", "Query Installed Apps", "Получить список установленных приложений"))
+            "context_time_now" -> AgentToolMeta("builtin", t("查询当前时间", "Query Current Time", "Узнать текущее время"))
+            "browser_use" -> AgentToolMeta("browser", t("浏览器操作", "Browser Action", "Действие в браузере"))
+            "android_privileged_action" -> AgentToolMeta("privileged", t("安卓高级动作", "Android Privileged Action", "Привилегированное действие Android"))
+            "android_privileged_session_start" -> AgentToolMeta("privileged", t("启动高权限会话", "Start Privileged Session", "Запустить привилегированный сеанс"))
+            "android_privileged_session_exec" -> AgentToolMeta("privileged", t("执行高权限命令", "Run Privileged Command", "Выполнить привилегированную команду"))
+            "android_privileged_session_read" -> AgentToolMeta("privileged", t("读取高权限输出", "Read Privileged Output", "Прочитать вывод привилегированного сеанса"))
+            "android_privileged_session_stop" -> AgentToolMeta("privileged", t("结束高权限会话", "Stop Privileged Session", "Завершить привилегированный сеанс"))
+            "terminal_execute" -> AgentToolMeta("terminal", t("终端执行", "Run Terminal Command", "Выполнить команду в терминале"))
+            "terminal_session_start" -> AgentToolMeta("terminal", t("启动终端会话", "Start Terminal Session", "Запустить сеанс терминала"))
+            "terminal_session_exec" -> AgentToolMeta("terminal", t("执行会话命令", "Run Session Command", "Выполнить команду в сеансе"))
+            "terminal_session_read" -> AgentToolMeta("terminal", t("读取会话输出", "Read Session Output", "Прочитать вывод сеанса"))
+            "terminal_session_stop" -> AgentToolMeta("terminal", t("结束终端会话", "Stop Terminal Session", "Завершить сеанс терминала"))
+            "file_read" -> AgentToolMeta("workspace", t("读取文件", "Read File", "Прочитать файл"))
+            "file_write" -> AgentToolMeta("workspace", t("写入文件", "Write File", "Записать файл"))
+            "file_edit" -> AgentToolMeta("workspace", t("编辑文件", "Edit File", "Изменить файл"))
+            "file_list" -> AgentToolMeta("workspace", t("列出文件", "List Files", "Показать файлы"))
+            "file_search" -> AgentToolMeta("workspace", t("搜索文件", "Search Files", "Найти файлы"))
+            "file_stat" -> AgentToolMeta("workspace", t("查看文件信息", "Inspect File", "Посмотреть сведения о файле"))
+            "file_move" -> AgentToolMeta("workspace", t("移动文件", "Move File", "Переместить файл"))
+            "schedule_task_create" -> AgentToolMeta("schedule", t("创建定时任务", "Create Scheduled Task", "Создать запланированную задачу"))
+            "schedule_task_list" -> AgentToolMeta("schedule", t("查看定时任务", "List Scheduled Tasks", "Показать запланированные задачи"))
+            "schedule_task_update" -> AgentToolMeta("schedule", t("修改定时任务", "Update Scheduled Task", "Изменить запланированную задачу"))
+            "schedule_task_delete" -> AgentToolMeta("schedule", t("删除定时任务", "Delete Scheduled Task", "Удалить запланированную задачу"))
+            "alarm_reminder_create" -> AgentToolMeta("alarm", t("创建提醒闹钟", "Create Reminder Alarm", "Создать напоминание"))
+            "alarm_reminder_list" -> AgentToolMeta("alarm", t("查看提醒闹钟", "List Reminder Alarms", "Показать напоминания"))
+            "alarm_reminder_delete" -> AgentToolMeta("alarm", t("删除提醒闹钟", "Delete Reminder Alarm", "Удалить напоминание"))
+            "calendar_list" -> AgentToolMeta("calendar", t("查看日历列表", "List Calendars", "Показать календари"))
+            "calendar_event_create" -> AgentToolMeta("calendar", t("创建日程", "Create Calendar Event", "Создать событие календаря"))
+            "calendar_event_list" -> AgentToolMeta("calendar", t("查询日程", "List Calendar Events", "Показать события календаря"))
+            "calendar_event_update" -> AgentToolMeta("calendar", t("修改日程", "Update Calendar Event", "Изменить событие календаря"))
+            "calendar_event_delete" -> AgentToolMeta("calendar", t("删除日程", "Delete Calendar Event", "Удалить событие календаря"))
+            "memory_search" -> AgentToolMeta("memory", t("检索记忆", "Search Memory", "Поиск в памяти"))
+            "memory_write_daily" -> AgentToolMeta("memory", t("写入当日记忆", "Write Daily Memory", "Записать в память за день"))
+            "memory_upsert_longterm" -> AgentToolMeta("memory", t("沉淀长期记忆", "Upsert Long-Term Memory", "Сохранить в долговременной памяти"))
+            "memory_rollup_day" -> AgentToolMeta("memory", t("整理当日记忆", "Roll Up Daily Memory", "Систематизировать память за день"))
+            "subagent_dispatch" -> AgentToolMeta("subagent", t("分派子任务", "Dispatch Subtasks", "Распределить подзадачи"))
             else -> {
                 val match = Regex("^mcp__(.+?)__(.+)$").find(toolName)
                 if (match != null) {
@@ -627,7 +628,8 @@ class AssistsCoreManager(private val context: Context) {
                 val names = result.missing.map(::localizedPermissionName)
                 summary = t(
                     "缺少权限：${names.joinToString("、")}",
-                    "Missing permissions: ${names.joinToString(", ")}"
+                    "Missing permissions: ${names.joinToString(", ")}",
+                    "Не хватает разрешений: ${names.joinToString(", ")}"
                 )
                 previewJson = JSONObject(mapOf("missing" to names)).toString()
                 rawResultJson = previewJson
@@ -1142,16 +1144,13 @@ class AssistsCoreManager(private val context: Context) {
 
     private fun buildMemoryGreetingRecordsBlock(records: List<Map<String, Any?>>): String {
         if (records.isEmpty()) {
-            return t("（暂无可用记忆）", "(No memory available yet)")
+            return t("（暂无可用记忆）", "(No memory available yet)", "(Доступной памяти пока нет)")
         }
         return records.joinToString(separator = "\n") { record ->
-            val title = record["title"]?.toString()?.trim().orEmpty().ifEmpty { t("无标题", "Untitled") }
-            val description = record["description"]?.toString()?.trim().orEmpty().ifEmpty { t("无描述", "No description") }
-            val appName = record["appName"]?.toString()?.trim().orEmpty().ifEmpty { t("未知来源", "Unknown source") }
-            t(
-                "标题: $title, 描述: $description, 来源应用: $appName",
-                "Title: $title, Description: $description, Source App: $appName"
-            )
+            val title = record["title"]?.toString()?.trim().orEmpty().ifEmpty { t("无标题", "Untitled", "Без названия") }
+            val description = record["description"]?.toString()?.trim().orEmpty().ifEmpty { t("无描述", "No description", "Без описания") }
+            val appName = record["appName"]?.toString()?.trim().orEmpty().ifEmpty { t("未知来源", "Unknown source", "Неизвестный источник") }
+            t("标题: $title, 描述: $description, 来源应用: $appName", "Title: $title, Description: $description, Source App: $appName", "Название: $title, описание: $description, приложение-источник: $appName")
         }
     }
 
@@ -1171,10 +1170,7 @@ class AssistsCoreManager(private val context: Context) {
                             put(
                                 "description",
                                 JsonPrimitive(
-                                    t(
-                                        "给用户的一句简短温暖问候语，不超过30字。",
-                                        "A short, warm greeting for the user, within 30 words."
-                                    )
+                                    t("给用户的一句简短温暖问候语，不超过30字。", "A short, warm greeting for the user, within 30 words.", "Короткое тёплое приветствие для пользователя, не более 30 слов.")
                                 )
                             )
                         }
@@ -1213,6 +1209,15 @@ class AssistsCoreManager(private val context: Context) {
                                 3. Do not begin with "Hi there".
                                 4. You must return the result through the $MEMORY_GREETING_TOOL tool instead of plain text.
                             """.trimIndent()
+                            PromptLocale.RU_RU -> """
+                                Ты — Omnibot, дружелюбный и внимательный ИИ-помощник.
+                                На основе памяти пользователя создай одно короткое, тёплое и персонализированное приветствие.
+                                Требования:
+                                1. Не более 30 слов.
+                                2. Тон тёплый и дружелюбный.
+                                3. Не начинай с шаблонного «Привет!» без связи с памятью пользователя.
+                                4. Результат необходимо вернуть через инструмент $MEMORY_GREETING_TOOL, а не обычным текстом.
+                            """.trimIndent()
                         }
                     )
                 ),
@@ -1227,6 +1232,10 @@ class AssistsCoreManager(private val context: Context) {
                             """
                             User memory:
                             $recordBlock
+                            """.trimIndent(),
+                            """
+                            Память пользователя:
+                            $recordBlock
                             """.trimIndent()
                         )
                     )
@@ -1238,7 +1247,7 @@ class AssistsCoreManager(private val context: Context) {
                 ChatCompletionTool(
                     function = ChatCompletionFunction(
                         name = MEMORY_GREETING_TOOL,
-                        description = t("提交记忆中心问候语。", "Submit the memory-center greeting."),
+                        description = t("提交记忆中心问候语。", "Submit the memory-center greeting.", "Отправить приветствие для раздела памяти."),
                         parameters = parameters
                     )
                 )
@@ -1273,6 +1282,19 @@ class AssistsCoreManager(private val context: Context) {
                 5. Output only the greeting itself, without quotes or extra explanation.
 
                 User memory:
+                $recordBlock
+            """.trimIndent()
+            PromptLocale.RU_RU -> """
+                Ты — Omnibot, дружелюбный и внимательный ИИ-помощник. На основе памяти пользователя, включая локальную и долговременную память, создай одно короткое и тёплое приветствие.
+
+                Требования:
+                1. Приветствие должно быть коротким, не более 30 слов.
+                2. Персонализируй его по содержимому памяти пользователя.
+                3. Сохраняй тёплый и дружелюбный тон.
+                4. Не начинай с шаблонного «Привет!» без связи с памятью пользователя.
+                5. Выведи только само приветствие, без кавычек и дополнительных пояснений.
+
+                Память пользователя:
                 $recordBlock
             """.trimIndent()
         }
@@ -2490,7 +2512,7 @@ class AssistsCoreManager(private val context: Context) {
         val notificationEnabled = call.argument<Boolean>("scheduleNotificationEnabled") != false
         return ScheduledSubagentRunMeta(
             scheduleTaskId = scheduleTaskId,
-            scheduleTaskTitle = title.ifBlank { t("SubAgent 定时任务", "SubAgent Scheduled Task") },
+            scheduleTaskTitle = title.ifBlank { t("SubAgent 定时任务", "SubAgent Scheduled Task", "Запланированная задача SubAgent") },
             notificationEnabled = notificationEnabled,
             conversationId = normalizedConversationId
         )
@@ -2522,7 +2544,7 @@ class AssistsCoreManager(private val context: Context) {
             .replace(Regex("\\s+"), " ")
             .trim()
         if (normalized.isEmpty()) {
-            return t("任务已完成，点击查看详情。", "Task completed. Tap to view details.")
+            return t("任务已完成，点击查看详情。", "Task completed. Tap to view details.", "Задача выполнена. Нажмите, чтобы посмотреть подробности.")
         }
         return if (normalized.length <= 120) {
             normalized
@@ -2556,10 +2578,10 @@ class AssistsCoreManager(private val context: Context) {
             manager.createNotificationChannel(
                 NotificationChannel(
                     SCHEDULED_SUBAGENT_NOTIFICATION_CHANNEL,
-                    t("SubAgent 定时任务", "SubAgent Scheduled Task"),
+                    t("SubAgent 定时任务", "SubAgent Scheduled Task", "Запланированная задача SubAgent"),
                     NotificationManager.IMPORTANCE_DEFAULT
                 ).apply {
-                    description = t("SubAgent 定时任务执行完成通知", "Notifications for completed scheduled SubAgent runs")
+                    description = t("SubAgent 定时任务执行完成通知", "Notifications for completed scheduled SubAgent runs", "Уведомления о завершённых запланированных запусках SubAgent")
                 }
             )
         }
@@ -2585,7 +2607,7 @@ class AssistsCoreManager(private val context: Context) {
             SCHEDULED_SUBAGENT_NOTIFICATION_CHANNEL
         )
             .setSmallIcon(iconRes)
-            .setContentTitle(meta.scheduleTaskTitle.ifBlank { t("SubAgent 定时任务", "SubAgent Scheduled Task") })
+            .setContentTitle(meta.scheduleTaskTitle.ifBlank { t("SubAgent 定时任务", "SubAgent Scheduled Task", "Запланированная задача SubAgent") })
             .setContentText(normalizeNotificationBody(message))
             .setStyle(
                 NotificationCompat.BigTextStyle()

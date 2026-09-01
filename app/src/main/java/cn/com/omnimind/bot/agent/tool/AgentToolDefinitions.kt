@@ -47,6 +47,8 @@ object AgentToolDefinitions {
                     "本次工具调用要做什么的简洁标题，展示给用户，建议 4-12 个字并使用与用户相同的语言。"
                 PromptLocale.EN_US ->
                     "A concise title describing what this tool call is doing. It is shown to the user, should stay short, and should use the same language as the user."
+                PromptLocale.RU_RU ->
+                    "Краткий заголовок, описывающий действие этого вызова инструмента. Он показывается пользователю, должен быть лаконичным и написан на том же языке, что и сообщение пользователя."
             }
         )
     }
