@@ -234,24 +234,25 @@ class WorkspaceMemoryService(
 
     private fun currentLocale(): PromptLocale = AppLocaleManager.resolvePromptLocale(context)
 
-    private fun t(zh: String, en: String): String {
+    private fun t(zh: String, en: String, ru: String): String {
         return when (currentLocale()) {
             PromptLocale.ZH_CN -> zh
             PromptLocale.EN_US -> en
+            PromptLocale.RU_RU -> ru
         }
     }
 
     private fun noDailyMemorySummary(): String =
-        t("无当日短期记忆，跳过整理。", "No daily short-term memory found. Rollup skipped.")
+        t("无当日短期记忆，跳过整理。", "No daily short-term memory found. Rollup skipped.", "Кратковременная память за сегодня не найдена. Систематизация пропущена.")
 
     private fun emptyDailyMemorySummary(): String =
-        t("当日短期记忆为空，跳过整理。", "The daily short-term memory file is empty. Rollup skipped.")
+        t("当日短期记忆为空，跳过整理。", "The daily short-term memory file is empty. Rollup skipped.", "Файл кратковременной памяти за сегодня пуст. Систематизация пропущена.")
 
     private fun emptyTodayShortMemoryText(): String =
-        t("（今日短期记忆为空）", "(Today's short-term memory is empty)")
+        t("（今日短期记忆为空）", "(Today's short-term memory is empty)", "(Кратковременная память за сегодня пуста)")
 
     private fun emptyLongTermMemoryText(): String =
-        t("（暂无长期记忆）", "(No long-term memory yet)")
+        t("（暂无长期记忆）", "(No long-term memory yet)", "(Долговременной памяти пока нет)")
 
     fun ensureInitialized() {
         workspaceManager.ensureRuntimeDirectories()
@@ -620,15 +621,9 @@ class WorkspaceMemoryService(
         val rollupAt = Instant.now().toString()
         val aiSummary = rollupInference?.summary?.trim()?.takeIf { it.isNotEmpty() }
         val rollupSummary = if (aiSummary != null) {
-            t(
-                "$aiSummary（沉淀 $writes 条长期记忆）",
-                "$aiSummary ($writes long-term memories written)"
-            )
+            t("$aiSummary（沉淀 $writes 条长期记忆）", "$aiSummary ($writes long-term memories written)", "$aiSummary (записано в долговременную память: $writes)")
         } else {
-            t(
-                "已整理 ${lines.size} 条短期记忆，沉淀 $writes 条长期记忆。",
-                "Rolled up ${lines.size} short-term memory entries and wrote $writes long-term memories."
-            )
+            t("已整理 ${lines.size} 条短期记忆，沉淀 $writes 条长期记忆。", "Rolled up ${lines.size} short-term memory entries and wrote $writes long-term memories.", "Систематизировано ${lines.size} записей кратковременной памяти; в долговременную память добавлено: $writes.")
         }
         val rollupSource = if (rollupInference != null) "scene.memory.rollup" else "heuristic"
         dailyFile.appendText(
@@ -856,10 +851,7 @@ class WorkspaceMemoryService(
                             put(
                                 "description",
                                 JsonPrimitive(
-                                    t(
-                                        "当日短期记忆的一句话总结，不超过80字。",
-                                        "A one-sentence summary of the day's short-term memory, within 80 words."
-                                    )
+                                    t("当日短期记忆的一句话总结，不超过80字。", "A one-sentence summary of the day's short-term memory, within 80 words.", "Краткое резюме кратковременной памяти за день одним предложением, не более 80 слов.")
                                 )
                             )
                         }
@@ -871,10 +863,7 @@ class WorkspaceMemoryService(
                             put(
                                 "description",
                                 JsonPrimitive(
-                                    t(
-                                        "可沉淀为长期记忆的稳定信息列表。",
-                                        "Stable facts that should be promoted into long-term memory."
-                                    )
+                                    t("可沉淀为长期记忆的稳定信息列表。", "Stable facts that should be promoted into long-term memory.", "Устойчивые факты, которые следует сохранить в долговременной памяти.")
                                 )
                             )
                             put(
@@ -920,10 +909,7 @@ class WorkspaceMemoryService(
                 ChatCompletionTool(
                     function = ChatCompletionFunction(
                         name = ROLLUP_SUBMIT_TOOL,
-                        description = t(
-                            "提交 Workspace 当日记忆整理结果。",
-                            "Submit the workspace daily-memory rollup result."
-                        ),
+                        description = t("提交 Workspace 当日记忆整理结果。", "Submit the workspace daily-memory rollup result.", "Отправить результат систематизации памяти Workspace за день."),
                         parameters = parameters
                     )
                 )
@@ -956,6 +942,17 @@ class WorkspaceMemoryService(
                 4. If nothing should be promoted, return an empty longTermCandidates array.
                 5. You must submit the result through the $ROLLUP_SUBMIT_TOOL tool and must not output normal text.
             """.trimIndent()
+            PromptLocale.RU_RU -> """
+                Ты — помощник по систематизации памяти Workspace.
+                Цель: составить краткое резюме кратковременной памяти за день и определить сведения, которые стоит перенести в долговременную память.
+
+                Правила:
+                1. Сохраняй только устойчивые сведения, которые будут полезны в будущих задачах: предпочтения, долгосрочные ограничения и стабильные факты.
+                2. Игнорируй разовые временные детали, случайные фрагменты беседы и быстро меняющиеся состояния.
+                3. Каждый кандидат в долговременную память должен состоять из одного предложения; всего не более ${MAX_ROLLUP_LONG_TERM_CANDIDATES} пунктов, без повторов.
+                4. Если сохранять нечего, верни пустой массив longTermCandidates.
+                5. Результат необходимо отправить через инструмент $ROLLUP_SUBMIT_TOOL; обычный текст не выводи.
+            """.trimIndent()
         }
     }
 
@@ -986,6 +983,15 @@ class WorkspaceMemoryService(
                 $dailyBlock
 
                 Existing long-term memory (to avoid duplicates):
+                ${truncateText(longTermBlock, 2600)}
+            """.trimIndent()
+            PromptLocale.RU_RU -> """
+                Дата: $date
+
+                Кратковременная память за день:
+                $dailyBlock
+
+                Текущая долговременная память (для исключения повторов):
                 ${truncateText(longTermBlock, 2600)}
             """.trimIndent()
         }
@@ -1048,6 +1054,30 @@ class WorkspaceMemoryService(
                 $dailyBlock
 
                 Existing long-term memory (to avoid duplicates):
+                ${truncateText(longTermBlock, 2600)}
+            """.trimIndent()
+            PromptLocale.RU_RU -> """
+                Ты — помощник по систематизации памяти Workspace. На основе кратковременной памяти за день составь итоговое резюме и выдели сведения, которые следует перенести в долговременную память.
+
+                Правила:
+                1. Сохраняй только устойчивые сведения, полезные для будущих задач: предпочтения, долгосрочные ограничения и стабильные факты.
+                2. Игнорируй разовые временные детали, случайные фрагменты беседы и быстро меняющиеся состояния.
+                3. Каждый кандидат в долговременную память должен состоять из одного предложения; всего не более ${MAX_ROLLUP_LONG_TERM_CANDIDATES} пунктов, без повторов.
+                4. Если сохранять нечего, верни пустой массив longTermCandidates.
+                5. Выводи только JSON. Не используй Markdown-кодовые блоки и не добавляй пояснений.
+
+                Формат ответа:
+                {
+                  "dailySummary": "краткое резюме одним предложением",
+                  "longTermCandidates": ["кандидат 1", "кандидат 2"]
+                }
+
+                Дата: $date
+
+                Кратковременная память за день:
+                $dailyBlock
+
+                Текущая долговременная память (для исключения повторов):
                 ${truncateText(longTermBlock, 2600)}
             """.trimIndent()
         }
