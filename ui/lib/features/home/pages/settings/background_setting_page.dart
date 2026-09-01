@@ -631,7 +631,7 @@ class _BackgroundSettingPageState extends State<BackgroundSettingPage> {
                 ),
                 OmniSegmentedOption<AppLanguageMode>(
                   value: AppLanguageMode.ru,
-                  label: 'Русский',
+                  label: context.l10n.languageRussian,
                   icon: LucideIcons.languages,
                   id: 'ru',
                 ),

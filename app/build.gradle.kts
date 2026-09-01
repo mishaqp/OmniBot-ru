@@ -221,10 +221,10 @@ android {
     signingConfigs {
         create("release") {
             // 引用全局gradle.properties中的变量
-            storeFile = project.findProperty("OMNI_RELEASE_STORE_FILE")?.let { file(it) }
-            storePassword = project.findProperty("OMNI_RELEASE_STORE_PWD") as String?
-            keyAlias = project.findProperty("OMNI_RELEASE_KEY_ALIAS") as String?
-            keyPassword = project.findProperty("OMNI_RELEASE_KEY_PWD") as String?
+            storeFile = project.findProperty("ANDROID_KEYSTORE_PATH")?.let { file(it) }
+            storePassword = project.findProperty("ANDROID_KEYSTORE_PASSWORD") as String?
+            keyAlias = project.findProperty("ANDROID_KEY_ALIAS") as String?
+            keyPassword = project.findProperty("ANDROID_KEY_PASSWORD") as String?
 
             // V2/V3签名配置（minSdk=30）
             enableV1Signing = false

@@ -16,6 +16,7 @@
   "languageFollowSystem": "System",
   "languageZhHans": "简体中文",
   "languageEnglish": "English",
+  "languageRussian": "Русский",
   "settingsTitle": "Settings",
   "settingsSectionModelMemory": "Models & Memory",
   "settingsSectionServiceEnvironment": "Services & Environment",

@@ -54,12 +54,12 @@ Options:
   --help              Show this help text.
 
 Required signing values (environment, ~/.gradle/gradle.properties, or prompt):
-  OMNI_RELEASE_STORE_PWD
-  OMNI_RELEASE_KEY_ALIAS
+  ANDROID_KEYSTORE_PASSWORD
+  ANDROID_KEY_ALIAS
 
 Optional environment variables:
-  OMNI_RELEASE_STORE_FILE   Defaults to ./release.jks when present.
-  OMNI_RELEASE_KEY_PWD      Defaults to OMNI_RELEASE_STORE_PWD.
+  ANDROID_KEYSTORE_PATH   Defaults to ./release.jks when present.
+  ANDROID_KEY_PASSWORD      Defaults to ANDROID_KEYSTORE_PASSWORD.
   OMNI_RELEASE_*            May also be set in ~/.gradle/gradle.properties.
   ANDROID_SDK_ROOT          Auto-detected from local.properties when absent.
   ANDROID_NDK_HOME          Auto-detected as $ANDROID_SDK_ROOT/ndk/28.2.13676358 when absent.
@@ -659,56 +659,56 @@ fi
 preflight_publish_settings
 
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
-load_gradle_property_if_empty OMNI_RELEASE_STORE_FILE
-load_gradle_property_if_empty OMNI_RELEASE_STORE_PWD
-load_gradle_property_if_empty OMNI_RELEASE_KEY_ALIAS
-load_gradle_property_if_empty OMNI_RELEASE_KEY_PWD
+load_gradle_property_if_empty ANDROID_KEYSTORE_PATH
+load_gradle_property_if_empty ANDROID_KEYSTORE_PASSWORD
+load_gradle_property_if_empty ANDROID_KEY_ALIAS
+load_gradle_property_if_empty ANDROID_KEY_PASSWORD
 
-if [[ -z "${OMNI_RELEASE_STORE_FILE:-}" && -f "$ROOT_DIR/release.jks" ]]; then
-  export OMNI_RELEASE_STORE_FILE="$ROOT_DIR/release.jks"
+if [[ -z "${ANDROID_KEYSTORE_PATH:-}" && -f "$ROOT_DIR/release.jks" ]]; then
+  export ANDROID_KEYSTORE_PATH="$ROOT_DIR/release.jks"
 fi
 
-if [[ -n "${OMNI_RELEASE_STORE_FILE:-}" ]]; then
-  case "$OMNI_RELEASE_STORE_FILE" in
-    "~/"*) export OMNI_RELEASE_STORE_FILE="${HOME}/${OMNI_RELEASE_STORE_FILE#~/}" ;;
+if [[ -n "${ANDROID_KEYSTORE_PATH:-}" ]]; then
+  case "$ANDROID_KEYSTORE_PATH" in
+    "~/"*) export ANDROID_KEYSTORE_PATH="${HOME}/${ANDROID_KEYSTORE_PATH#~/}" ;;
     /*) ;;
-    *) export OMNI_RELEASE_STORE_FILE="$ROOT_DIR/$OMNI_RELEASE_STORE_FILE" ;;
+    *) export ANDROID_KEYSTORE_PATH="$ROOT_DIR/$ANDROID_KEYSTORE_PATH" ;;
   esac
 fi
 
-prompt_if_empty OMNI_RELEASE_STORE_PWD "Release keystore password" 1
-prompt_if_empty OMNI_RELEASE_KEY_ALIAS "Release key alias" 0
+prompt_if_empty ANDROID_KEYSTORE_PASSWORD "Release keystore password" 1
+prompt_if_empty ANDROID_KEY_ALIAS "Release key alias" 0
 
-if [[ -z "${OMNI_RELEASE_STORE_PWD:-}" ]]; then
-  echo "Missing OMNI_RELEASE_STORE_PWD" >&2
+if [[ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ]]; then
+  echo "Missing ANDROID_KEYSTORE_PASSWORD" >&2
   echo "Set it in the environment, ~/.gradle/gradle.properties, or rerun without --non-interactive to enter it." >&2
   exit 1
 fi
 
-if [[ -z "${OMNI_RELEASE_KEY_ALIAS:-}" ]]; then
-  echo "Missing OMNI_RELEASE_KEY_ALIAS" >&2
+if [[ -z "${ANDROID_KEY_ALIAS:-}" ]]; then
+  echo "Missing ANDROID_KEY_ALIAS" >&2
   echo "Set it in the environment, ~/.gradle/gradle.properties, or rerun without --non-interactive to enter it." >&2
   exit 1
 fi
 
-if [[ -z "${OMNI_RELEASE_STORE_FILE:-}" ]]; then
-  echo "Missing OMNI_RELEASE_STORE_FILE and default ./release.jks was not found" >&2
+if [[ -z "${ANDROID_KEYSTORE_PATH:-}" ]]; then
+  echo "Missing ANDROID_KEYSTORE_PATH and default ./release.jks was not found" >&2
   exit 1
 fi
 
-if [[ ! -f "$OMNI_RELEASE_STORE_FILE" ]]; then
-  echo "Keystore not found: $OMNI_RELEASE_STORE_FILE" >&2
+if [[ ! -f "$ANDROID_KEYSTORE_PATH" ]]; then
+  echo "Keystore not found: $ANDROID_KEYSTORE_PATH" >&2
   exit 1
 fi
 
-if [[ -z "${OMNI_RELEASE_KEY_PWD:-}" ]]; then
-  export OMNI_RELEASE_KEY_PWD="$OMNI_RELEASE_STORE_PWD"
+if [[ -z "${ANDROID_KEY_PASSWORD:-}" ]]; then
+  export ANDROID_KEY_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"
 fi
 
-export ORG_GRADLE_PROJECT_OMNI_RELEASE_STORE_FILE="$OMNI_RELEASE_STORE_FILE"
-export ORG_GRADLE_PROJECT_OMNI_RELEASE_STORE_PWD="$OMNI_RELEASE_STORE_PWD"
-export ORG_GRADLE_PROJECT_OMNI_RELEASE_KEY_ALIAS="$OMNI_RELEASE_KEY_ALIAS"
-export ORG_GRADLE_PROJECT_OMNI_RELEASE_KEY_PWD="$OMNI_RELEASE_KEY_PWD"
+export ORG_GRADLE_PROJECT_ANDROID_KEYSTORE_PATH="$ANDROID_KEYSTORE_PATH"
+export ORG_GRADLE_PROJECT_ANDROID_KEYSTORE_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"
+export ORG_GRADLE_PROJECT_ANDROID_KEY_ALIAS="$ANDROID_KEY_ALIAS"
+export ORG_GRADLE_PROJECT_ANDROID_KEY_PASSWORD="$ANDROID_KEY_PASSWORD"
 
 if [[ -z "${ANDROID_SDK_ROOT:-}" && -f "$ROOT_DIR/local.properties" ]]; then
   sdk_dir="$(sed -n 's/^sdk\.dir=//p' "$ROOT_DIR/local.properties" | tail -n 1)"
@@ -763,7 +763,7 @@ echo "Edition(s): ${EDITIONS[*]}"
 echo "Release ref: $REF_NAME"
 echo "Release track: $RELEASE_TRACK"
 echo "Staging dir: $OUT_DIR"
-echo "Keystore: $OMNI_RELEASE_STORE_FILE"
+echo "Keystore: $ANDROID_KEYSTORE_PATH"
 echo "Android SDK: $ANDROID_SDK_ROOT"
 echo "Android NDK: $ANDROID_NDK_HOME"
 echo "Gradle max workers: $max_workers"
