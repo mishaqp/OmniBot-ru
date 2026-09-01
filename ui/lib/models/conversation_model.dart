@@ -248,8 +248,10 @@ class ConversationModel {
       // 显示星期几
       final weekdays = LegacyTextLocalizer.isEnglish
           ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-          : ['一', '二', '三', '四', '五', '六', '日'];
-      return LegacyTextLocalizer.isEnglish
+          : (LegacyTextLocalizer.isRussian
+                ? ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+                : ['一', '二', '三', '四', '五', '六', '日']);
+      return LegacyTextLocalizer.isEnglish || LegacyTextLocalizer.isRussian
           ? weekdays[updatedDate.weekday - 1]
           : '周${weekdays[updatedDate.weekday - 1]}';
     } else {

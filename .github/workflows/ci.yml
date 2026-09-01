@@ -110,6 +110,10 @@ jobs:
         working-directory: ui
         run: flutter pub get --enforce-lockfile
 
+      - name: Generate Flutter localizations
+        working-directory: ui
+        run: flutter gen-l10n
+
       - name: Flutter test
         working-directory: ui
         run: flutter test test/core/router/go_router_config_test.dart

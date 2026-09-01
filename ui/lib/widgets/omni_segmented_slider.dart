@@ -139,22 +139,25 @@ class OmniSegmentedSlider<T> extends StatelessWidget {
                               borderRadius: BorderRadius.circular(height / 2),
                               onTap: () => onChanged(option.value),
                               child: Center(
-                                child: AnimatedScale(
-                                  duration: const Duration(milliseconds: 180),
-                                  curve: Curves.easeOutCubic,
-                                  scale: selected ? 1.0 : 0.97,
-                                  child: AnimatedDefaultTextStyle(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: AnimatedScale(
                                     duration: const Duration(milliseconds: 180),
                                     curve: Curves.easeOutCubic,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: selected
-                                          ? FontWeight.w700
-                                          : FontWeight.w600,
-                                      color: foreground,
-                                      letterSpacing: selected ? 0.1 : 0,
+                                    scale: selected ? 1.0 : 0.97,
+                                    child: AnimatedDefaultTextStyle(
+                                      duration: const Duration(milliseconds: 180),
+                                      curve: Curves.easeOutCubic,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: selected
+                                            ? FontWeight.w700
+                                            : FontWeight.w600,
+                                        color: foreground,
+                                        letterSpacing: selected ? 0.1 : 0,
+                                      ),
+                                      child: label,
                                     ),
-                                    child: label,
                                   ),
                                 ),
                               ),

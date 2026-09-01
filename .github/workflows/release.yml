@@ -227,21 +227,66 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
 
-      - name: Decode release keystore
+      - name: Restore temporary test signing key
+        id: temporary_signing_cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/omnibot-test-release.jks
+          key: omnibot-test-signing-v1-${{ github.repository }}
+
+      - name: Generate temporary GitHub Actions signing key
+        if: steps.temporary_signing_cache.outputs.cache-hit != 'true'
         shell: bash
         env:
-          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE }}
+          TEST_SIGNING_PASSWORD: 'OmniBot-CI-Test-2026'
         run: |
           set -euo pipefail
 
-          if [[ -z "${RELEASE_KEYSTORE_B64}" ]]; then
-            echo "Missing RELEASE_KEYSTORE secret." >&2
+          keytool -genkeypair -v \
+            -storetype JKS \
+            -keystore "$RUNNER_TEMP/omnibot-test-release.jks" \
+            -alias omnibot-ci-test \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -storepass "$TEST_SIGNING_PASSWORD" \
+            -keypass "$TEST_SIGNING_PASSWORD" \
+            -dname "CN=OmniBot CI Test, OU=GitHub Actions, O=OmniBot, C=US" \
+            -noprompt
+          chmod 600 "$RUNNER_TEMP/omnibot-test-release.jks"
+
+      - name: Configure temporary release signing
+        shell: bash
+        env:
+          TEST_SIGNING_PASSWORD: 'OmniBot-CI-Test-2026'
+        run: |
+          set -euo pipefail
+
+          keystore="$RUNNER_TEMP/omnibot-test-release.jks"
+          if [[ ! -s "$keystore" ]]; then
+            echo "Temporary test keystore was not restored or generated." >&2
+            exit 1
+          fi
+          chmod 600 "$keystore"
+
+          cert_sha256="$(keytool -list -v \
+            -keystore "$keystore" \
+            -storepass "$TEST_SIGNING_PASSWORD" \
+            -alias omnibot-ci-test |
+            awk -F': ' '/SHA256:/ { gsub(":", "", $2); gsub(/[[:space:]]/, "", $2); print $2; exit }')"
+          if [[ -z "$cert_sha256" ]]; then
+            echo "Could not read the temporary test certificate SHA-256 fingerprint." >&2
             exit 1
           fi
 
-          printf '%s' "${RELEASE_KEYSTORE_B64}" | base64 --decode > "${RUNNER_TEMP}/release.jks"
-          chmod 600 "${RUNNER_TEMP}/release.jks"
-
+          {
+            echo "OMNI_RELEASE_STORE_FILE=$keystore"
+            echo "OMNI_RELEASE_STORE_PWD=$TEST_SIGNING_PASSWORD"
+            echo "OMNI_RELEASE_KEY_ALIAS=omnibot-ci-test"
+            echo "OMNI_RELEASE_KEY_PWD=$TEST_SIGNING_PASSWORD"
+            echo "EXPECTED_CERT_SHA256=$cert_sha256"
+          } >> "$GITHUB_ENV"
+          echo "Configured temporary GitHub Actions release signing certificate: $cert_sha256"
       - name: Build production release APKs
         shell: bash
         env:
@@ -249,10 +294,6 @@ jobs:
           RELEASE_ASSET_DIR: ${{ steps.artifacts.outputs.dir }}
           GRADLE_OPTS: >-
             -Dorg.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8 --enable-native-access=ALL-UNNAMED
-          OMNI_RELEASE_STORE_FILE: ${{ runner.temp }}/release.jks
-          OMNI_RELEASE_STORE_PWD: ${{ secrets.RELEASE_PASSWORD }}
-          OMNI_RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-          OMNI_RELEASE_KEY_PWD: ${{ secrets.RELEASE_PASSWORD }}
         run: |
           set -euo pipefail
 
@@ -261,6 +302,47 @@ jobs:
             --tag "${RELEASE_REF_NAME}" \
             --out-dir "${RELEASE_ASSET_DIR}" \
             --non-interactive
+
+      - name: Verify APK release signature
+        shell: bash
+        env:
+          RELEASE_ASSET_DIR: ${{ steps.artifacts.outputs.dir }}
+          SAFE_REF_NAME: ${{ steps.release_ref.outputs.safe_ref_name }}
+          ANDROID_BUILD_TOOLS_VERSION: ${{ env.ANDROID_BUILD_TOOLS_VERSION }}
+        run: |
+          set -euo pipefail
+
+          apk_path="$RELEASE_ASSET_DIR/OpenOmniBot-$SAFE_REF_NAME-standard.apk"
+          apksigner="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS_VERSION/apksigner"
+          if [[ ! -x "$apksigner" ]]; then
+            echo "Android apksigner not found: $apksigner" >&2
+            exit 1
+          fi
+
+          verification="$("$apksigner" verify --verbose --print-certs "$apk_path" 2>&1)"
+          printf '%s\n' "$verification"
+          if ! grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' <<<"$verification"; then
+            echo "The APK is not verified with APK Signature Scheme v2." >&2
+            exit 1
+          fi
+          if grep -Eiq 'androiddebugkey|Android Debug' <<<"$verification"; then
+            echo "The release APK appears to be signed with the Android debug key." >&2
+            exit 1
+          fi
+
+          cert_sha256="$(printf '%s\n' "$verification" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ { print $2; exit }' | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
+          if [[ -z "$cert_sha256" ]]; then
+            echo "Could not read the APK signing certificate SHA-256 fingerprint." >&2
+            exit 1
+          fi
+          if [[ -n "$EXPECTED_CERT_SHA256" ]]; then
+            expected_sha256="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
+            if [[ "$cert_sha256" != "$expected_sha256" ]]; then
+              echo "APK signing certificate does not match EXPECTED_CERT_SHA256." >&2
+              exit 1
+            fi
+          fi
+          echo "APK release certificate SHA-256: $cert_sha256"
 
       - name: Verify release artifacts
         shell: bash
