@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:ui/services/storage_service.dart';
+import 'package:ui/l10n/legacy_ru_text_localizer.dart';
 
 typedef _TextRewriter = String Function(RegExpMatch match);
 
@@ -596,6 +597,9 @@ class LegacyTextLocalizer {
 
   static String localize(String text, {Locale? locale}) {
     final targetLocale = locale ?? _resolvedLocale;
+    if (targetLocale.languageCode == 'ru') {
+      return LegacyRuTextLocalizer.localize(text);
+    }
     if (targetLocale.languageCode != 'en') {
       return text;
     }
