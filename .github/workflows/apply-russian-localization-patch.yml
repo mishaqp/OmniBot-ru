@@ -25,20 +25,20 @@ jobs:
           path = Path('ui/lib/features/home/pages/settings/background_setting_page.dart')
           text = path.read_text(encoding='utf-8')
           old = (
-              "              OmniSegmentedOption<AppLanguageMode>(\n"
-              "                value: AppLanguageMode.en,\n"
-              "                label: context.l10n.languageEnglish,\n"
-              "                icon: LucideIcons.languages,\n"
-              "                id: 'en',\n"
-              "              ),\n"
+              "                OmniSegmentedOption<AppLanguageMode>(\n"
+              "                  value: AppLanguageMode.en,\n"
+              "                  label: context.l10n.languageEnglish,\n"
+              "                  icon: LucideIcons.languages,\n"
+              "                  id: 'en',\n"
+              "                ),\n"
           )
           russian = (
-              "              OmniSegmentedOption<AppLanguageMode>(\n"
-              "                value: AppLanguageMode.ru,\n"
-              "                label: 'Русский',\n"
-              "                icon: LucideIcons.languages,\n"
-              "                id: 'ru',\n"
-              "              ),\n"
+              "                OmniSegmentedOption<AppLanguageMode>(\n"
+              "                  value: AppLanguageMode.ru,\n"
+              "                  label: 'Русский',\n"
+              "                  icon: LucideIcons.languages,\n"
+              "                  id: 'ru',\n"
+              "                ),\n"
           )
           count = text.count(old)
           if count != 1:
