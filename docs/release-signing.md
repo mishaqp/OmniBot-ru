@@ -1,19 +1,32 @@
 # Release signing
 
-Production APKs must always use the same private keystore. Android only
-accepts an update when the new APK is signed by the same certificate as the
-installed production APK.
+## Текущий тестовый режим
 
-Configure these repository Actions secrets:
+Сейчас `.github/workflows/release.yml` использует временную подпись для тестов.
 
-- OMNI_RELEASE_KEYSTORE_BASE64: base64-encoded permanent .jks file
-- OMNI_RELEASE_STORE_PASSWORD: keystore password
-- OMNI_RELEASE_KEY_ALIAS: release key alias
-- OMNI_RELEASE_KEY_PASSWORD: release key password
-- OMNI_RELEASE_CERT_SHA256: certificate fingerprint used to pin the release
-  identity in CI
+- GitHub Actions создаёт отдельный release-keystore через `keytool`.
+- Ключ не попадает в репозиторий и не используется для debug-сборки.
+- Keystore хранится в кэше GitHub Actions под ключом `omnibot-test-signing-v1`.
+- Последующие тестовые запуски используют тот же сертификат и могут обновлять уже установленный тестовый APK.
+- Пароль и alias нужны только внутри CI и не являются постоянными секретами релиза.
 
-Create a keystore only for a brand-new app identity:
+Важно: кэш GitHub Actions временный. Если его удалить или GitHub вытеснит его, будет создан новый сертификат. После этого APK с новым ключом нельзя установить поверх старого — удалите старую тестовую версию или дождитесь восстановления постоянного ключа.
+
+Такой ключ подходит только для личных тестов. Не публикуйте тестовый APK как стабильный релиз и не используйте его для Google Play.
+
+## Постоянная подпись для настоящего релиза
+
+Перед публичным релизом временный режим нужно заменить на постоянный keystore. Android принимает обновление только при совпадении сертификата подписи с уже установленным приложением.
+
+Постоянный keystore не следует коммитить в репозиторий. Для настоящего релиза потребуются Actions secrets:
+
+- `OMNI_RELEASE_KEYSTORE_BASE64` — base64 постоянного `.jks`;
+- `OMNI_RELEASE_STORE_PASSWORD` — пароль keystore;
+- `OMNI_RELEASE_KEY_ALIAS` — alias ключа;
+- `OMNI_RELEASE_KEY_PASSWORD` — пароль ключа;
+- `OMNI_RELEASE_CERT_SHA256` — SHA-256 сертификата для проверки в CI.
+
+Пример создания постоянного keystore для новой идентичности приложения:
 
 ~~~bash
 keytool -genkeypair -v \
@@ -24,17 +37,11 @@ keytool -genkeypair -v \
   -validity 10000
 ~~~
 
-Print the certificate fingerprint and encode the keystore:
+Проверка сертификата и кодирование:
 
 ~~~bash
 keytool -list -v -keystore omnibot-release.jks -alias omnibot-release
 base64 -w 0 omnibot-release.jks
 ~~~
 
-Never commit the keystore or its passwords. Never replace the keystore after
-publishing an APK; keep a secure backup instead. The workflow validates the
-alias, rejects androiddebugkey and debug.keystore, and verifies the final APK
-certificate with apksigner.
-
-Debug builds use the separate package cn.com.omnimind.bot.debug. Production
-builds keep the update package cn.com.omnimind.bot.
+Debug builds use the separate package `cn.com.omnimind.bot.debug`. Production builds keep the update package `cn.com.omnimind.bot`.
