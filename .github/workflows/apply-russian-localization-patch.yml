@@ -19,37 +19,40 @@ jobs:
           fetch-depth: 0
 
       - name: Add Russian language option to Appearance
-        shell: python
         run: |
+          python3 - <<'PY'
           from pathlib import Path
-
           path = Path('ui/lib/features/home/pages/settings/background_setting_page.dart')
           text = path.read_text(encoding='utf-8')
-          old = """              OmniSegmentedOption<AppLanguageMode>(
-                value: AppLanguageMode.en,
-                label: context.l10n.languageEnglish,
-                icon: LucideIcons.languages,
-                id: 'en',
-              ),
-"""
-          new = old + """              OmniSegmentedOption<AppLanguageMode>(
-                value: AppLanguageMode.ru,
-                label: 'Русский',
-                icon: LucideIcons.languages,
-                id: 'ru',
-              ),
-"""
+          old = (
+              "              OmniSegmentedOption<AppLanguageMode>(\n"
+              "                value: AppLanguageMode.en,\n"
+              "                label: context.l10n.languageEnglish,\n"
+              "                icon: LucideIcons.languages,\n"
+              "                id: 'en',\n"
+              "              ),\n"
+          )
+          russian = (
+              "              OmniSegmentedOption<AppLanguageMode>(\n"
+              "                value: AppLanguageMode.ru,\n"
+              "                label: 'Русский',\n"
+              "                icon: LucideIcons.languages,\n"
+              "                id: 'ru',\n"
+              "              ),\n"
+          )
           count = text.count(old)
           if count != 1:
               raise SystemExit(f'Expected exactly one language selector block, found {count}')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          path.write_text(text.replace(old, old + russian, 1), encoding='utf-8')
+          PY
 
       - name: Validate Russian ARB JSON
-        shell: python
         run: |
+          python3 - <<'PY'
           import json
           from pathlib import Path
           json.loads(Path('ui/lib/l10n/app_ru.arb').read_text(encoding='utf-8'))
+          PY
 
       - name: Remove temporary workflow and commit patch
         run: |
