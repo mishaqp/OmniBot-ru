@@ -1,0 +1,37 @@
+name: Audit Russian localization coverage
+
+on:
+  push:
+    branches: [feature/russian-localization]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/russian-localization
+      - name: Audit localized text and OOB sources
+        shell: bash
+        run: |
+          echo '=== APP_LOCALIZED_TEXT_CALLS ==='
+          grep -RIn --include='*.kt' 'LocalizedText(' app baselib plugins 2>/dev/null || true
+          echo '=== OOB_LOCALE_ACCESS ==='
+          grep -RIn --include='*.kt' -E '\.(zhCn|enUs)|OobActionSchema' app baselib plugins 2>/dev/null || true
+          echo '=== OOB_GENERATOR_REFERENCES ==='
+          grep -RIn -E 'generate-oob-action-schema|oob_canonical_actions' . --exclude-dir=.git 2>/dev/null || true
+          echo '=== OOB_EN_US_VALUES ==='
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('plugins/omni-vlm-lite/schemas/oob/oob_canonical_actions.v1.json')
+          d=json.loads(p.read_text())
+          def walk(x,path='$'):
+              if isinstance(x,dict):
+                  if 'en_us' in x and 'zh_cn' in x:
+                      print(path+'\t'+x['en_us'])
+                  for k,v in x.items(): walk(v,f'{path}.{k}')
+              elif isinstance(x,list):
+                  for i,v in enumerate(x): walk(v,f'{path}[{i}]')
+          walk(d)
+          PY
