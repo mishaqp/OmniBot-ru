@@ -30,8 +30,6 @@ jobs:
           def write(path, text):
               Path(path).write_text(text, encoding='utf-8')
 
-          # Standardize signing variable names. GitHub Actions keeps fallback to
-          # the legacy secrets so existing repository configuration still works.
           mappings = {
               'OMNI_RELEASE_STORE_FILE': 'ANDROID_KEYSTORE_PATH',
               'OMNI_RELEASE_STORE_PWD': 'ANDROID_KEYSTORE_PASSWORD',
@@ -66,34 +64,10 @@ jobs:
           )
           write(release_path, text)
 
-          # Fix the last mixed-language typo in the Russian Agent prompt.
           for path in Path('app').rglob('AgentSystemPrompt.kt'):
               text = path.read_text(encoding='utf-8').replace('или整理 памяти', 'или упорядочивания памяти')
               write(path, text)
 
-          # Give installed-skill summaries explicit Russian text instead of EN fallback.
-          for path in Path('.').rglob('InstalledSkillInfo.kt'):
-              text = path.read_text(encoding='utf-8')
-              replacements = [
-                  (
-                      'enUS = "Omnibot can use ${finalLabel} through $cleanName.",',
-                      'enUS = "Omnibot can use ${finalLabel} through $cleanName.",\n                ruRU = "Omnibot может использовать ${finalLabel} через $cleanName.",',
-                  ),
-                  (
-                      'enUS = "Omnibot can use ${tools.size} tools through $cleanName.",',
-                      'enUS = "Omnibot can use ${tools.size} tools through $cleanName.",\n                ruRU = "Omnibot может использовать ${tools.size} инструментов через $cleanName.",',
-                  ),
-                  (
-                      'enUS = "Omnibot can use the installed skill $cleanName.",',
-                      'enUS = "Omnibot can use the installed skill $cleanName.",\n                ruRU = "Omnibot может использовать установленный skill: $cleanName.",',
-                  ),
-              ]
-              for old, new in replacements:
-                  if old in text and 'ruRU = ' not in text[text.find(old):text.find(old)+300]:
-                      text = text.replace(old, new, 1)
-              write(path, text)
-
-          # Add a generated-localization key for the Russian language name.
           for path_str in ['ui/lib/l10n/app_en.arb', 'ui/lib/l10n/app_zh.arb', 'ui/lib/l10n/app_ru.arb']:
               path = Path(path_str)
               text = path.read_text(encoding='utf-8')
@@ -127,20 +101,17 @@ jobs:
           find . -type f \( -iname '*oob*' -o -iname '*action*schema*' \) -not -path './.git/*' | sort | head -200
           echo '=== OOB schema consumers ==='
           grep -RIn --include='*.kt' --include='*.java' -E 'OobActionSchema|\.enUs|\.zhCn|uiLabel|promptGuide' app baselib assists uikit 2>/dev/null | head -500 || true
-          echo '=== InstalledSkillInfo ==='
-          find . -name 'InstalledSkillInfo.kt' -print
-          echo '=== Remaining mixed Chinese marker in RU Agent prompt ==='
-          grep -RIn --include='*.kt' '整理' app 2>/dev/null || true
           echo '=== Signing variables ==='
           grep -RIn -E 'ANDROID_KEYSTORE_(BASE64|PATH|PASSWORD)|ANDROID_KEY_(ALIAS|PASSWORD)' .github/workflows/release.yml scripts/build-local-release.sh app/build.gradle.kts
 
-      - name: Commit finalization changes
+      - name: Commit non-workflow finalization changes
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/workflows/release.yml scripts/build-local-release.sh app/build.gradle.kts app ui
+          git restore .github/workflows/release.yml
+          git add scripts/build-local-release.sh app/build.gradle.kts app ui
           if git diff --cached --quiet; then
             echo 'No source changes to commit.'
             exit 0
