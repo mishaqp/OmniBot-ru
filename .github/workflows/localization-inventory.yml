@@ -1,0 +1,20 @@
+name: Localization inventory
+
+on:
+  push:
+    branches:
+      - feature/russian-localization
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inventory native localized text and Android resources
+        run: |
+          echo '=== LocalizedText call sites ==='
+          grep -RIn --include='*.kt' --include='*.java' 'LocalizedText(' app baselib data 2>/dev/null || true
+          echo '=== Android strings.xml files ==='
+          find app baselib data -path '*/src/main/res/values*/strings.xml' -print 2>/dev/null | sort || true
+          echo '=== Flutter trLegacy call sites count ==='
+          grep -RIn --include='*.dart' 'trLegacy(' ui/lib 2>/dev/null | wc -l || true
