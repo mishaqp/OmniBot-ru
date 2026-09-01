@@ -541,7 +541,7 @@ class _BackgroundSettingPageState extends State<BackgroundSettingPage> {
               _buildAdjustCard(),
               if (_showPetAppearanceSettings) ...[
                 const SizedBox(height: 18),
-                SettingsSectionTitle(label: '宠物'),
+                SettingsSectionTitle(label: context.trLegacy('宠物')),
                 _buildPetCard(),
               ],
             ],
@@ -628,6 +628,12 @@ class _BackgroundSettingPageState extends State<BackgroundSettingPage> {
                   label: context.l10n.languageEnglish,
                   icon: LucideIcons.languages,
                   id: 'en',
+                ),
+                OmniSegmentedOption<AppLanguageMode>(
+                  value: AppLanguageMode.ru,
+                  label: context.l10n.languageRussian,
+                  icon: LucideIcons.languages,
+                  id: 'ru',
                 ),
               ],
               onChanged: (nextMode) {

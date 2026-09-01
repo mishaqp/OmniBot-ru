@@ -16,11 +16,17 @@ class BotStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isEnglish = Localizations.localeOf(context).languageCode == 'en';
-    if (status == BotStatusType.completed && isEnglish) {
-      final completedText = (costTime != null && costTime!.trim().isNotEmpty)
-          ? 'Thought for ${costTime!.trim()}'
-          : 'Thought complete';
+    final languageCode = Localizations.localeOf(context).languageCode;
+    final isEnglish = languageCode == 'en';
+    final isRussian = languageCode == 'ru';
+    if (status == BotStatusType.completed && (isEnglish || isRussian)) {
+      final completedText = isRussian
+          ? ((costTime != null && costTime!.trim().isNotEmpty)
+                ? 'Размышление заняло ${costTime!.trim()}'
+                : 'Размышление завершено')
+          : ((costTime != null && costTime!.trim().isNotEmpty)
+                ? 'Thought for ${costTime!.trim()}'
+                : 'Thought complete');
       return _buildStatusRow(
         context,
         icon: Icons.check_circle,
@@ -33,24 +39,24 @@ class BotStatus extends StatelessWidget {
         return _buildStatusRow(
           context,
           svgPath: 'assets/chatbot/thinking_icon.svg',
-          text: Localizations.localeOf(context).languageCode == 'en'
-              ? 'Thinking...'
-              : '正在思考...',
-          timeDesc: Localizations.localeOf(context).languageCode == 'en'
-              ? 'Time taken'
-              : '已用时',
+          text: isRussian
+              ? 'Размышление...'
+              : (isEnglish ? 'Thinking...' : '正在思考...'),
+          timeDesc: isRussian
+              ? 'Время'
+              : (isEnglish ? 'Time taken' : '已用时'),
           costTime: costTime,
         );
       case BotStatusType.completed:
         return _buildStatusRow(
           context,
           icon: Icons.check_circle,
-          text: Localizations.localeOf(context).languageCode == 'en'
-              ? 'Thinking complete'
-              : '已完成思考',
-          timeDesc: Localizations.localeOf(context).languageCode == 'en'
-              ? 'Total time'
-              : '总用时',
+          text: isRussian
+              ? 'Размышление завершено'
+              : (isEnglish ? 'Thinking complete' : '已完成思考'),
+          timeDesc: isRussian
+              ? 'Общее время'
+              : (isEnglish ? 'Total time' : '总用时'),
           costTime: costTime,
         );
       case BotStatusType.hint:
@@ -59,9 +65,7 @@ class BotStatus extends StatelessWidget {
           svgPath: 'assets/chatbot/thinking_icon.svg',
           text:
               hintText ??
-              (Localizations.localeOf(context).languageCode == 'en'
-                  ? 'Hint'
-                  : '提示'),
+              (isRussian ? 'Подсказка' : (isEnglish ? 'Hint' : '提示')),
         );
     }
   }

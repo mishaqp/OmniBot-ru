@@ -171,8 +171,8 @@ android {
         targetSdk = 35
         // Beta release. Keep the Android version code monotonic so the APK
         // can be installed as an update over the previously tested build.
-        versionCode = 10
-        versionName = "0.6.0.3"
+        versionCode = 11
+        versionName = "0.6.0.4"
         buildConfigField("String", "IMAGE_BASE_URL", buildConfigString(omnibotImageBaseUrl))
         buildConfigField("String", "IMAGE_MODEL", buildConfigString(omnibotImageModel))
         buildConfigField("String", "IMAGE_API_KEY", buildConfigString(omnibotImageApiKey))
@@ -219,14 +219,45 @@ android {
         }
     }
     signingConfigs {
-        create("release") {
-            // 引用全局gradle.properties中的变量
-            storeFile = project.findProperty("OMNI_RELEASE_STORE_FILE")?.let { file(it) }
-            storePassword = project.findProperty("OMNI_RELEASE_STORE_PWD") as String?
-            keyAlias = project.findProperty("OMNI_RELEASE_KEY_ALIAS") as String?
-            keyPassword = project.findProperty("OMNI_RELEASE_KEY_PWD") as String?
+        val releaseStoreFile = prop("OMNI_RELEASE_STORE_FILE")
+        val releaseStorePassword = prop("OMNI_RELEASE_STORE_PWD")
+        val releaseKeyAlias = prop("OMNI_RELEASE_KEY_ALIAS")
+        val releaseKeyPassword = prop("OMNI_RELEASE_KEY_PWD")
+        val releaseTaskRequested = gradle.startParameter.taskNames.any {
+            it.contains("release", ignoreCase = true)
+        }
 
-            // V2/V3签名配置（minSdk=30）
+        if (releaseTaskRequested) {
+            require(releaseStoreFile.isNotBlank()) {
+                "OMNI_RELEASE_STORE_FILE is required for release builds; debug.keystore is not accepted."
+            }
+            require(file(releaseStoreFile).isFile) {
+                "Release keystore does not exist: $releaseStoreFile"
+            }
+            require(releaseStorePassword.isNotBlank()) {
+                "OMNI_RELEASE_STORE_PWD is required for release builds."
+            }
+            require(releaseKeyAlias.isNotBlank()) {
+                "OMNI_RELEASE_KEY_ALIAS is required for release builds."
+            }
+            require(releaseKeyPassword.isNotBlank()) {
+                "OMNI_RELEASE_KEY_PWD is required for release builds."
+            }
+            require(!releaseStoreFile.endsWith("debug.keystore", ignoreCase = true)) {
+                "Android debug.keystore cannot sign a release build."
+            }
+            require(!releaseKeyAlias.equals("androiddebugkey", ignoreCase = true)) {
+                "androiddebugkey cannot sign a release build."
+            }
+        }
+
+        create("release") {
+            storeFile = releaseStoreFile.takeIf { it.isNotBlank() }?.let { file(it) }
+            storePassword = releaseStorePassword.takeIf { it.isNotBlank() }
+            keyAlias = releaseKeyAlias.takeIf { it.isNotBlank() }
+            keyPassword = releaseKeyPassword.takeIf { it.isNotBlank() }
+
+            // V2/V3 signing is required for current Android releases.
             enableV1Signing = false
             enableV2Signing = true
             enableV3Signing = true
@@ -266,10 +297,9 @@ android {
         }
         debug {
             signingConfig = signingConfigs.getByName("debug")
-            // There is one installable debug app for device validation.  A
-            // suffix here creates a second launcher entry beside the normal
-            // package, which makes users switch between two identical APKs.
-            applicationIdSuffix = ""
+            // Keep debug installs separate from the production package so a
+            // debug-signed APK can never be mistaken for an update.
+            applicationIdSuffix = ".debug"
             isMinifyEnabled = false
             buildConfigField("boolean", "ENABLE_LLMTHU_BOOTSTRAP", "true")
             buildConfigField(

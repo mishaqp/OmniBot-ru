@@ -220,20 +220,29 @@ class ScheduledTask {
   /// 获取下次执行时间的显示文本
   String getNextExecutionTimeText() {
     final en = LegacyTextLocalizer.isEnglish;
-    if (nextExecutionTime == null) return en ? 'Not set' : '未设置';
+    final ru = LegacyTextLocalizer.isRussian;
+    if (nextExecutionTime == null) {
+      return en ? 'Not set' : (ru ? 'Не задано' : '未设置');
+    }
 
     final nextTime = DateTime.fromMillisecondsSinceEpoch(nextExecutionTime!);
     final now = DateTime.now();
     final diff = nextTime.difference(now);
 
-    if (diff.isNegative) return en ? 'Expired' : '已过期';
+    if (diff.isNegative) return en ? 'Expired' : (ru ? 'Истекло' : '已过期');
 
     if (diff.inDays > 0) {
-      return en ? '${diff.inDays}d later' : '${diff.inDays}天后';
+      return en
+          ? '${diff.inDays}d later'
+          : (ru ? 'Через ${diff.inDays} дн.' : '${diff.inDays}天后');
     } else if (diff.inHours > 0) {
-      return en ? '${diff.inHours}h later' : '${diff.inHours}小时后';
+      return en
+          ? '${diff.inHours}h later'
+          : (ru ? 'Через ${diff.inHours} ч.' : '${diff.inHours}小时后');
     } else if (diff.inMinutes > 0) {
-      return en ? '${diff.inMinutes}m later' : '${diff.inMinutes}分钟后';
+      return en
+          ? '${diff.inMinutes}m later'
+          : (ru ? 'Через ${diff.inMinutes} мин.' : '${diff.inMinutes}分钟后');
     } else {
       return en ? 'Starting soon' : '即将执行';
     }

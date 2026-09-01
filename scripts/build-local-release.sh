@@ -54,12 +54,14 @@ Options:
   --help              Show this help text.
 
 Required signing values (environment, ~/.gradle/gradle.properties, or prompt):
+  OMNI_RELEASE_STORE_FILE
   OMNI_RELEASE_STORE_PWD
   OMNI_RELEASE_KEY_ALIAS
+  OMNI_RELEASE_KEY_PWD
 
 Optional environment variables:
   OMNI_RELEASE_STORE_FILE   Defaults to ./release.jks when present.
-  OMNI_RELEASE_KEY_PWD      Defaults to OMNI_RELEASE_STORE_PWD.
+  OMNI_RELEASE_KEY_PWD      Defaults to OMNI_RELEASE_STORE_PWD when omitted.
   OMNI_RELEASE_*            May also be set in ~/.gradle/gradle.properties.
   ANDROID_SDK_ROOT          Auto-detected from local.properties when absent.
   ANDROID_NDK_HOME          Auto-detected as $ANDROID_SDK_ROOT/ndk/28.2.13676358 when absent.
@@ -705,6 +707,17 @@ if [[ -z "${OMNI_RELEASE_KEY_PWD:-}" ]]; then
   export OMNI_RELEASE_KEY_PWD="$OMNI_RELEASE_STORE_PWD"
 fi
 
+release_store_file_lower="$(printf '%s' "$OMNI_RELEASE_STORE_FILE" | tr '[:upper:]' '[:lower:]')"
+release_key_alias_lower="$(printf '%s' "$OMNI_RELEASE_KEY_ALIAS" | tr '[:upper:]' '[:lower:]')"
+if [[ "$release_store_file_lower" == *debug.keystore ]]; then
+  echo "Refusing to sign a release APK with Android debug.keystore." >&2
+  exit 1
+fi
+if [[ "$release_key_alias_lower" == "androiddebugkey" ]]; then
+  echo "Refusing to sign a release APK with androiddebugkey." >&2
+  exit 1
+fi
+
 export ORG_GRADLE_PROJECT_OMNI_RELEASE_STORE_FILE="$OMNI_RELEASE_STORE_FILE"
 export ORG_GRADLE_PROJECT_OMNI_RELEASE_STORE_PWD="$OMNI_RELEASE_STORE_PWD"
 export ORG_GRADLE_PROJECT_OMNI_RELEASE_KEY_ALIAS="$OMNI_RELEASE_KEY_ALIAS"
@@ -774,6 +787,8 @@ mkdir -p "$ARTIFACT_DIR"
 if [[ "$SKIP_FLUTTER" -eq 0 ]]; then
   echo "Installing Flutter dependencies..."
   (cd "$FLUTTER_DIR" && flutter pub get --enforce-lockfile)
+  echo "Generating Flutter localizations..."
+  (cd "$FLUTTER_DIR" && flutter gen-l10n)
 fi
 
 for edition in "${EDITIONS[@]}"; do
