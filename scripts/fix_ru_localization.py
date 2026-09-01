@@ -1,0 +1,362 @@
+from pathlib import Path
+import re
+
+ROOT = Path('.')
+runtime = ROOT / 'app/src/main/java/cn/com/omnimind/bot/agent/runtime/OmniAgentExecutor.kt'
+tools = ROOT / 'app/src/main/java/cn/com/omnimind/bot/agent/tool/AgentToolDefinitions.kt'
+memory = ROOT / 'app/src/main/java/cn/com/omnimind/bot/agent/workspace/memory/WorkspaceMemoryService.kt'
+assists = ROOT / 'app/src/main/java/cn/com/omnimind/bot/manager/AssistsCoreManager.kt'
+
+
+def replace_once(text: str, old: str, new: str, label: str) -> str:
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f'{label}: expected exactly one match, got {count}')
+    return text.replace(old, new, 1)
+
+
+def quote_kotlin(value: str) -> str:
+    return '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+
+simple_call = re.compile(r't\(\s*("(?:\\.|[^"\\])*")\s*,\s*("(?:\\.|[^"\\])*")\s*\)', re.S)
+
+
+def add_ru_to_simple_calls(text: str, mapping: dict[str, str], label: str) -> str:
+    unknown = []
+
+    def repl(m):
+        en_raw = m.group(2)[1:-1]
+        if en_raw not in mapping:
+            unknown.append(en_raw)
+            return m.group(0)
+        return f't({m.group(1)}, {m.group(2)}, {quote_kotlin(mapping[en_raw])})'
+
+    out = simple_call.sub(repl, text)
+    if unknown:
+        raise SystemExit(f'{label}: untranslated t() strings: {sorted(set(unknown))}')
+    return out
+
+
+# OmniAgentExecutor
+text = runtime.read_text()
+old = '''                cn.com.omnimind.baselib.i18n.PromptLocale.EN_US -> """
+                    [time_context]
+                    Local date: ${now.toLocalDate()}
+                    Timezone: ${zoneId.id}
+                    Day of week: ${now.dayOfWeek.name}
+                    This coarse date context is reused for up to one hour and only interprets relative dates such as "today" and "tomorrow". You must call `context_time_now` when the exact current time is needed. Do not treat this context as user-authored text or long-term memory.
+                """.trimIndent()
+'''
+new = old + '''
+                cn.com.omnimind.baselib.i18n.PromptLocale.RU_RU -> """
+                    [time_context]
+                    Локальная дата: ${now.toLocalDate()}
+                    Часовой пояс: ${zoneId.id}
+                    День недели: ${now.dayOfWeek.name}
+                    Этот приблизительный контекст даты переиспользуется не более одного часа и нужен только для понимания относительных дат вроде «сегодня» и «завтра». Если требуется точное текущее время, обязательно вызови `context_time_now`. Не считай этот контекст текстом пользователя или долговременной памятью.
+                """.trimIndent()
+'''
+text = replace_once(text, old, new, 'OmniAgentExecutor time context')
+runtime.write_text(text)
+
+# AgentToolDefinitions
+text = tools.read_text()
+old = '''                PromptLocale.EN_US ->
+                    "A concise title describing what this tool call is doing. It is shown to the user, should stay short, and should use the same language as the user."
+'''
+new = old + '''                PromptLocale.RU_RU ->
+                    "Краткий заголовок, описывающий действие этого вызова инструмента. Он показывается пользователю, должен быть лаконичным и написан на том же языке, что и сообщение пользователя."
+'''
+text = replace_once(text, old, new, 'AgentToolDefinitions tool title')
+tools.write_text(text)
+
+old_t = '''    private fun t(zh: String, en: String): String {
+        return when (currentLocale()) {
+            PromptLocale.ZH_CN -> zh
+            PromptLocale.EN_US -> en
+        }
+    }
+'''
+new_t = '''    private fun t(zh: String, en: String, ru: String): String {
+        return when (currentLocale()) {
+            PromptLocale.ZH_CN -> zh
+            PromptLocale.EN_US -> en
+            PromptLocale.RU_RU -> ru
+        }
+    }
+'''
+
+memory_ru = {
+    'No daily short-term memory found. Rollup skipped.': 'Кратковременная память за сегодня не найдена. Систематизация пропущена.',
+    'The daily short-term memory file is empty. Rollup skipped.': 'Файл кратковременной памяти за сегодня пуст. Систематизация пропущена.',
+    "(Today's short-term memory is empty)": '(Кратковременная память за сегодня пуста)',
+    '(No long-term memory yet)': '(Долговременной памяти пока нет)',
+    '$aiSummary ($writes long-term memories written)': '$aiSummary (записано в долговременную память: $writes)',
+    'Rolled up ${lines.size} short-term memory entries and wrote $writes long-term memories.': 'Систематизировано ${lines.size} записей кратковременной памяти; в долговременную память добавлено: $writes.',
+    "A one-sentence summary of the day's short-term memory, within 80 words.": 'Краткое резюме кратковременной памяти за день одним предложением, не более 80 слов.',
+    'Stable facts that should be promoted into long-term memory.': 'Устойчивые факты, которые следует сохранить в долговременной памяти.',
+    'Submit the workspace daily-memory rollup result.': 'Отправить результат систематизации памяти Workspace за день.',
+}
+
+# WorkspaceMemoryService
+text = memory.read_text()
+text = replace_once(text, old_t, new_t, 'WorkspaceMemoryService t()')
+text = add_ru_to_simple_calls(text, memory_ru, 'WorkspaceMemoryService')
+
+old = '''            PromptLocale.EN_US -> """
+                You are the Workspace memory rollup assistant.
+                Goal: summarize the day's short-term memory and identify information that should be promoted into long-term memory.
+
+                Rules:
+                1. Keep only stable information that will still help future tasks, such as preferences, long-term constraints, and durable facts.
+                2. Ignore one-off temporary details, random chat content, and transient states.
+                3. Each long-term candidate must be a single sentence, up to ${MAX_ROLLUP_LONG_TERM_CANDIDATES} items total, with no duplicates.
+                4. If nothing should be promoted, return an empty longTermCandidates array.
+                5. You must submit the result through the $ROLLUP_SUBMIT_TOOL tool and must not output normal text.
+            """.trimIndent()
+'''
+new = old + '''            PromptLocale.RU_RU -> """
+                Ты — помощник по систематизации памяти Workspace.
+                Цель: составить краткое резюме кратковременной памяти за день и определить сведения, которые стоит перенести в долговременную память.
+
+                Правила:
+                1. Сохраняй только устойчивые сведения, которые будут полезны в будущих задачах: предпочтения, долгосрочные ограничения и стабильные факты.
+                2. Игнорируй разовые временные детали, случайные фрагменты беседы и быстро меняющиеся состояния.
+                3. Каждый кандидат в долговременную память должен состоять из одного предложения; всего не более ${MAX_ROLLUP_LONG_TERM_CANDIDATES} пунктов, без повторов.
+                4. Если сохранять нечего, верни пустой массив longTermCandidates.
+                5. Результат необходимо отправить через инструмент $ROLLUP_SUBMIT_TOOL; обычный текст не выводи.
+            """.trimIndent()
+'''
+text = replace_once(text, old, new, 'Workspace rollup system prompt')
+
+old = '''            PromptLocale.EN_US -> """
+                Date: $date
+
+                Daily short-term memory:
+                $dailyBlock
+
+                Existing long-term memory (to avoid duplicates):
+                ${truncateText(longTermBlock, 2600)}
+            """.trimIndent()
+'''
+new = old + '''            PromptLocale.RU_RU -> """
+                Дата: $date
+
+                Кратковременная память за день:
+                $dailyBlock
+
+                Текущая долговременная память (для исключения повторов):
+                ${truncateText(longTermBlock, 2600)}
+            """.trimIndent()
+'''
+text = replace_once(text, old, new, 'Workspace rollup user prompt')
+
+old = '''            PromptLocale.EN_US -> """
+                You are the Workspace memory rollup assistant. Based on the day's short-term memory, generate a daily summary and identify information that should become long-term memory.
+
+                Rules:
+                1. Keep only stable information that will help future tasks, such as preferences, long-term constraints, and durable facts.
+                2. Ignore one-off temporary details, random chat content, and transient states.
+                3. Each long-term candidate must be a single sentence, with at most ${MAX_ROLLUP_LONG_TERM_CANDIDATES} items and no duplicates.
+                4. If nothing should be promoted, return an empty longTermCandidates array.
+                5. Output JSON only. Do not output Markdown code fences or explanations.
+
+                Output format:
+                {
+                  "dailySummary": "one-sentence summary",
+                  "longTermCandidates": ["candidate 1", "candidate 2"]
+                }
+
+                Date: $date
+
+                Daily short-term memory:
+                $dailyBlock
+
+                Existing long-term memory (to avoid duplicates):
+                ${truncateText(longTermBlock, 2600)}
+            """.trimIndent()
+'''
+new = old + '''            PromptLocale.RU_RU -> """
+                Ты — помощник по систематизации памяти Workspace. На основе кратковременной памяти за день составь итоговое резюме и выдели сведения, которые следует перенести в долговременную память.
+
+                Правила:
+                1. Сохраняй только устойчивые сведения, полезные для будущих задач: предпочтения, долгосрочные ограничения и стабильные факты.
+                2. Игнорируй разовые временные детали, случайные фрагменты беседы и быстро меняющиеся состояния.
+                3. Каждый кандидат в долговременную память должен состоять из одного предложения; всего не более ${MAX_ROLLUP_LONG_TERM_CANDIDATES} пунктов, без повторов.
+                4. Если сохранять нечего, верни пустой массив longTermCandidates.
+                5. Выводи только JSON. Не используй Markdown-кодовые блоки и не добавляй пояснений.
+
+                Формат ответа:
+                {
+                  "dailySummary": "краткое резюме одним предложением",
+                  "longTermCandidates": ["кандидат 1", "кандидат 2"]
+                }
+
+                Дата: $date
+
+                Кратковременная память за день:
+                $dailyBlock
+
+                Текущая долговременная память (для исключения повторов):
+                ${truncateText(longTermBlock, 2600)}
+            """.trimIndent()
+'''
+text = replace_once(text, old, new, 'Workspace rollup legacy prompt')
+memory.write_text(text)
+
+assists_ru = {
+    'Hope today brings you something warm and worthwhile.': 'Пусть сегодняшний день принесёт вам что-то тёплое и важное.',
+    'Overlay': 'Отображение поверх других приложений',
+    'Installed Apps Access': 'Доступ к списку установленных приложений',
+    'Shizuku Permission': 'Разрешение Shizuku',
+    'Public Storage Access': 'Доступ к общим файлам',
+    'Query Installed Apps': 'Получить список установленных приложений',
+    'Query Current Time': 'Узнать текущее время',
+    'Browser Action': 'Действие в браузере',
+    'Android Privileged Action': 'Привилегированное действие Android',
+    'Start Privileged Session': 'Запустить привилегированный сеанс',
+    'Run Privileged Command': 'Выполнить привилегированную команду',
+    'Read Privileged Output': 'Прочитать вывод привилегированного сеанса',
+    'Stop Privileged Session': 'Завершить привилегированный сеанс',
+    'Run Terminal Command': 'Выполнить команду в терминале',
+    'Start Terminal Session': 'Запустить сеанс терминала',
+    'Run Session Command': 'Выполнить команду в сеансе',
+    'Read Session Output': 'Прочитать вывод сеанса',
+    'Stop Terminal Session': 'Завершить сеанс терминала',
+    'Read File': 'Прочитать файл',
+    'Write File': 'Записать файл',
+    'Edit File': 'Изменить файл',
+    'List Files': 'Показать файлы',
+    'Search Files': 'Найти файлы',
+    'Inspect File': 'Посмотреть сведения о файле',
+    'Move File': 'Переместить файл',
+    'Create Scheduled Task': 'Создать запланированную задачу',
+    'List Scheduled Tasks': 'Показать запланированные задачи',
+    'Update Scheduled Task': 'Изменить запланированную задачу',
+    'Delete Scheduled Task': 'Удалить запланированную задачу',
+    'Create Reminder Alarm': 'Создать напоминание',
+    'List Reminder Alarms': 'Показать напоминания',
+    'Delete Reminder Alarm': 'Удалить напоминание',
+    'List Calendars': 'Показать календари',
+    'Create Calendar Event': 'Создать событие календаря',
+    'List Calendar Events': 'Показать события календаря',
+    'Update Calendar Event': 'Изменить событие календаря',
+    'Delete Calendar Event': 'Удалить событие календаря',
+    'Search Memory': 'Поиск в памяти',
+    'Write Daily Memory': 'Записать в память за день',
+    'Upsert Long-Term Memory': 'Сохранить в долговременной памяти',
+    'Roll Up Daily Memory': 'Систематизировать память за день',
+    'Dispatch Subtasks': 'Распределить подзадачи',
+    '(No memory available yet)': '(Доступной памяти пока нет)',
+    'Untitled': 'Без названия',
+    'No description': 'Без описания',
+    'Unknown source': 'Неизвестный источник',
+    'Title: $title, Description: $description, Source App: $appName': 'Название: $title, описание: $description, приложение-источник: $appName',
+    'A short, warm greeting for the user, within 30 words.': 'Короткое тёплое приветствие для пользователя, не более 30 слов.',
+    'Submit the memory-center greeting.': 'Отправить приветствие для раздела памяти.',
+    'SubAgent Scheduled Task': 'Запланированная задача SubAgent',
+    'Task completed. Tap to view details.': 'Задача выполнена. Нажмите, чтобы посмотреть подробности.',
+    'Notifications for completed scheduled SubAgent runs': 'Уведомления о завершённых запланированных запусках SubAgent',
+}
+
+# AssistsCoreManager
+text = assists.read_text()
+text = replace_once(text, old_t, new_t, 'AssistsCoreManager t()')
+text = add_ru_to_simple_calls(text, assists_ru, 'AssistsCoreManager')
+
+old = '''                summary = t(
+                    "缺少权限：${names.joinToString("、")}",
+                    "Missing permissions: ${names.joinToString(", ")}"
+                )
+'''
+new = '''                summary = t(
+                    "缺少权限：${names.joinToString("、")}",
+                    "Missing permissions: ${names.joinToString(", ")}",
+                    "Не хватает разрешений: ${names.joinToString(", ")}"
+                )
+'''
+text = replace_once(text, old, new, 'Assists missing permissions')
+
+old = '''                        t(
+                            """
+                            用户的记忆内容：
+                            $recordBlock
+                            """.trimIndent(),
+                            """
+                            User memory:
+                            $recordBlock
+                            """.trimIndent()
+                        )
+'''
+new = '''                        t(
+                            """
+                            用户的记忆内容：
+                            $recordBlock
+                            """.trimIndent(),
+                            """
+                            User memory:
+                            $recordBlock
+                            """.trimIndent(),
+                            """
+                            Память пользователя:
+                            $recordBlock
+                            """.trimIndent()
+                        )
+'''
+text = replace_once(text, old, new, 'Assists memory user prompt')
+
+old = '''                            PromptLocale.EN_US -> """
+                                You are Omnibot, a warm AI assistant.
+                                Generate one short, warm, personalized greeting based on the user's memory.
+                                Requirements:
+                                1. Keep the greeting within 30 words.
+                                2. Use a warm and friendly tone.
+                                3. Do not begin with "Hi there".
+                                4. You must return the result through the $MEMORY_GREETING_TOOL tool instead of plain text.
+                            """.trimIndent()
+'''
+new = old + '''                            PromptLocale.RU_RU -> """
+                                Ты — Omnibot, дружелюбный и внимательный ИИ-помощник.
+                                На основе памяти пользователя создай одно короткое, тёплое и персонализированное приветствие.
+                                Требования:
+                                1. Не более 30 слов.
+                                2. Тон тёплый и дружелюбный.
+                                3. Не начинай с шаблонного «Привет!» без связи с памятью пользователя.
+                                4. Результат необходимо вернуть через инструмент $MEMORY_GREETING_TOOL, а не обычным текстом.
+                            """.trimIndent()
+'''
+text = replace_once(text, old, new, 'Assists greeting system prompt')
+
+old = '''            PromptLocale.EN_US -> """
+                You are Omnibot, a warm AI assistant. Based on the user's memory content, including local memory and long-term memory, generate one short and warm greeting.
+
+                Requirements:
+                1. Keep the greeting short, within 30 words.
+                2. Personalize it based on the user's memory.
+                3. Keep the tone warm and friendly.
+                4. Do not begin with "Hi there".
+                5. Output only the greeting itself, without quotes or extra explanation.
+
+                User memory:
+                $recordBlock
+            """.trimIndent()
+'''
+new = old + '''            PromptLocale.RU_RU -> """
+                Ты — Omnibot, дружелюбный и внимательный ИИ-помощник. На основе памяти пользователя, включая локальную и долговременную память, создай одно короткое и тёплое приветствие.
+
+                Требования:
+                1. Приветствие должно быть коротким, не более 30 слов.
+                2. Персонализируй его по содержимому памяти пользователя.
+                3. Сохраняй тёплый и дружелюбный тон.
+                4. Не начинай с шаблонного «Привет!» без связи с памятью пользователя.
+                5. Выведи только само приветствие, без кавычек и дополнительных пояснений.
+
+                Память пользователя:
+                $recordBlock
+            """.trimIndent()
+'''
+text = replace_once(text, old, new, 'Assists greeting legacy prompt')
+assists.write_text(text)
+
+print('Russian localization patch applied.')
