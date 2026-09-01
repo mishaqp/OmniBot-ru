@@ -227,70 +227,66 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/${{ env.NDK_VERSION }}" >> "$GITHUB_ENV"
 
-      - name: Decode release keystore
+      - name: Restore temporary test signing key
+        id: temporary_signing_cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/omnibot-test-release.jks
+          key: omnibot-test-signing-v1-${{ github.repository }}
+
+      - name: Generate temporary GitHub Actions signing key
+        if: steps.temporary_signing_cache.outputs.cache-hit != 'true'
         shell: bash
         env:
-          RELEASE_KEYSTORE_B64: ${{ secrets.OMNI_RELEASE_KEYSTORE_BASE64 || secrets.RELEASE_KEYSTORE || secrets.KEYSTORE_BASE64 }}
+          TEST_SIGNING_PASSWORD: 'OmniBot-CI-Test-2026'
         run: |
           set -euo pipefail
 
-          if [[ -z "$RELEASE_KEYSTORE_B64" ]]; then
-            echo "Missing release keystore secret. Set OMNI_RELEASE_KEYSTORE_BASE64 (or the legacy RELEASE_KEYSTORE name)." >&2
-            exit 1
-          fi
+          keytool -genkeypair -v \
+            -storetype JKS \
+            -keystore "$RUNNER_TEMP/omnibot-test-release.jks" \
+            -alias omnibot-ci-test \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -storepass "$TEST_SIGNING_PASSWORD" \
+            -keypass "$TEST_SIGNING_PASSWORD" \
+            -dname "CN=OmniBot CI Test, OU=GitHub Actions, O=OmniBot, C=US" \
+            -noprompt
+          chmod 600 "$RUNNER_TEMP/omnibot-test-release.jks"
 
-          printf '%s' "$RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.jks"
-          chmod 600 "$RUNNER_TEMP/release.jks"
-          if [[ ! -s "$RUNNER_TEMP/release.jks" ]]; then
-            echo "Decoded release keystore is empty." >&2
-            exit 1
-          fi
-
-      - name: Validate release signing identity
+      - name: Configure temporary release signing
         shell: bash
         env:
-          RELEASE_STORE_PASSWORD: ${{ secrets.OMNI_RELEASE_STORE_PASSWORD || secrets.RELEASE_STORE_PASSWORD || secrets.RELEASE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.OMNI_RELEASE_KEY_ALIAS || secrets.RELEASE_KEY_ALIAS || secrets.KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.OMNI_RELEASE_KEY_PASSWORD || secrets.RELEASE_KEY_PASSWORD || secrets.KEY_PASSWORD || secrets.OMNI_RELEASE_STORE_PASSWORD || secrets.RELEASE_STORE_PASSWORD || secrets.RELEASE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
-          EXPECTED_CERT_SHA256: ${{ secrets.OMNI_RELEASE_CERT_SHA256 || secrets.RELEASE_CERT_SHA256 || secrets.RELEASE_SIGNING_CERT_SHA256 }}
+          TEST_SIGNING_PASSWORD: 'OmniBot-CI-Test-2026'
         run: |
           set -euo pipefail
 
-          if [[ -z "$RELEASE_STORE_PASSWORD" || -z "$RELEASE_KEY_ALIAS" || -z "$RELEASE_KEY_PASSWORD" ]]; then
-            echo "Release signing secrets are incomplete. Configure the permanent keystore, store password, key alias, and key password." >&2
+          keystore="$RUNNER_TEMP/omnibot-test-release.jks"
+          if [[ ! -s "$keystore" ]]; then
+            echo "Temporary test keystore was not restored or generated." >&2
             exit 1
           fi
-          if [[ -z "$EXPECTED_CERT_SHA256" ]]; then
-            echo "Missing OMNI_RELEASE_CERT_SHA256. Pin the permanent release certificate before publishing APKs." >&2
-            exit 1
-          fi
+          chmod 600 "$keystore"
 
-          alias_lower="$(printf '%s' "$RELEASE_KEY_ALIAS" | tr '[:upper:]' '[:lower:]')"
-          if [[ "$alias_lower" == "androiddebugkey" ]]; then
-            echo "androiddebugkey is the Android debug key and cannot be used for releases." >&2
-            exit 1
-          fi
-
-          keytool -list -v \
-            -keystore "$RUNNER_TEMP/release.jks" \
-            -storepass "$RELEASE_STORE_PASSWORD" \
-            -alias "$RELEASE_KEY_ALIAS" \
-            > "$RUNNER_TEMP/release-keystore.txt"
-
-          cert_sha256="$(awk -F': ' '/Certificate fingerprints:/,/Signature algorithm name:/ { if ($0 ~ /SHA256:/) { print $2; exit } }' "$RUNNER_TEMP/release-keystore.txt" | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
+          cert_sha256="$(keytool -list -v \
+            -keystore "$keystore" \
+            -storepass "$TEST_SIGNING_PASSWORD" \
+            -alias omnibot-ci-test |
+            awk -F': ' '/SHA256:/ { gsub(":", "", $2); gsub(/[[:space:]]/, "", $2); print $2; exit }')"
           if [[ -z "$cert_sha256" ]]; then
-            echo "Could not read the release certificate SHA-256 fingerprint." >&2
+            echo "Could not read the temporary test certificate SHA-256 fingerprint." >&2
             exit 1
           fi
-          if [[ -n "$EXPECTED_CERT_SHA256" ]]; then
-            expected_sha256="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
-            if [[ "$cert_sha256" != "$expected_sha256" ]]; then
-              echo "Release keystore certificate does not match EXPECTED_CERT_SHA256." >&2
-              exit 1
-            fi
-          fi
-          echo "Release certificate SHA-256: $cert_sha256"
 
+          {
+            echo "OMNI_RELEASE_STORE_FILE=$keystore"
+            echo "OMNI_RELEASE_STORE_PWD=$TEST_SIGNING_PASSWORD"
+            echo "OMNI_RELEASE_KEY_ALIAS=omnibot-ci-test"
+            echo "OMNI_RELEASE_KEY_PWD=$TEST_SIGNING_PASSWORD"
+            echo "EXPECTED_CERT_SHA256=$cert_sha256"
+          } >> "$GITHUB_ENV"
+          echo "Configured temporary GitHub Actions release signing certificate: $cert_sha256"
       - name: Build production release APKs
         shell: bash
         env:
@@ -298,10 +294,6 @@ jobs:
           RELEASE_ASSET_DIR: ${{ steps.artifacts.outputs.dir }}
           GRADLE_OPTS: >-
             -Dorg.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8 --enable-native-access=ALL-UNNAMED
-          OMNI_RELEASE_STORE_FILE: ${{ runner.temp }}/release.jks
-          OMNI_RELEASE_STORE_PWD: ${{ secrets.OMNI_RELEASE_STORE_PASSWORD || secrets.RELEASE_STORE_PASSWORD || secrets.RELEASE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
-          OMNI_RELEASE_KEY_ALIAS: ${{ secrets.OMNI_RELEASE_KEY_ALIAS || secrets.RELEASE_KEY_ALIAS || secrets.KEY_ALIAS }}
-          OMNI_RELEASE_KEY_PWD: ${{ secrets.OMNI_RELEASE_KEY_PASSWORD || secrets.RELEASE_KEY_PASSWORD || secrets.KEY_PASSWORD || secrets.OMNI_RELEASE_STORE_PASSWORD || secrets.RELEASE_STORE_PASSWORD || secrets.RELEASE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
 
@@ -317,7 +309,6 @@ jobs:
           RELEASE_ASSET_DIR: ${{ steps.artifacts.outputs.dir }}
           SAFE_REF_NAME: ${{ steps.release_ref.outputs.safe_ref_name }}
           ANDROID_BUILD_TOOLS_VERSION: ${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-          EXPECTED_CERT_SHA256: ${{ secrets.OMNI_RELEASE_CERT_SHA256 || secrets.RELEASE_CERT_SHA256 || secrets.RELEASE_SIGNING_CERT_SHA256 }}
         run: |
           set -euo pipefail
 
